@@ -18,7 +18,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
   const trans_id = req.params.trans_id;
 
   const {
-    key,
+    
     AID,
     RRN,
     STAN,
@@ -49,10 +49,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     transmissionDateTime,
   } = req.body;
 
-  if (process.env.KEY != key) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-    return;
-  }
+  
   await transactions.create({
     aid: AID,
     rrn: RRN,
@@ -100,7 +97,9 @@ if(!owner_of_storm_wallet){
 
 const new_wallet_balance= owner_of_storm_wallet.dataValues.wallet_balance
 
-const new_wallet_balance_95_percent= new_wallet_balance+ new_wallet_balance*0.95
+console.log('amount'+amount)
+
+const new_wallet_balance_95_percent= new_wallet_balance+ amount*0.95
 
 console.log(new_wallet_balance_95_percent)
 
@@ -151,28 +150,34 @@ const getOneTransactions = async (req, res) => {
 };
 
 const getTransactionByDate = async (req, res) => {
-  const { date } = req.body;
+  const { dateLowerBound, dateUpperBound } = req.body;
 
-  console.log(date);
+  console.log(dateUpperBound);
   //month first in req body
 
-  const date_in_milliseconds = new Date(date + ' 00:00').getTime();
+  const dateLowerBound_in_milliseconds = new Date(dateLowerBound + ' 00:00').getTime();
 
-  console.log(date_in_milliseconds);
 
-  const next_day_in_milliseconds = date_in_milliseconds + 86400 * 1000;
 
-  const date_to_get = new Date(date_in_milliseconds);
+  const dateUpperBound_in_milliseconds = new Date(dateUpperBound + ' 00:00').getTime() ;
 
-  const next_day = new Date(next_day_in_milliseconds);
+    console.log(dateUpperBound_in_milliseconds);
 
-  console.log(next_day);
+  console.log('date lupper millis'+ dateUpperBound_in_milliseconds)
+
+  const dateToGetLower = new Date(dateLowerBound_in_milliseconds);
+
+  const dateToGetUpper = new Date(dateUpperBound_in_milliseconds +86400 *1000);
+
+  console.log('date'+dateToGetLower)
+
+  console.log(dateToGetUpper);
 
   const transaction = await transactions.findAll({
     where: {
       createdAt: {
-        [Op.lt]: next_day,
-        [Op.gt]: date_to_get,
+        [Op.lt]: dateToGetUpper,
+        [Op.gt]: dateToGetLower,
       },
     },
   });

@@ -16,7 +16,7 @@ module.exports = {
           len: 10,
         },
       },
-      wallet_balance: { type: DataTypes.INTEGER, allowNull: false },
+      wallet_balance: { type: DataTypes.FLOAT, allowNull: false },
 
       createdAt: {
         allowNull: false,

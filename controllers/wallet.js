@@ -1,6 +1,6 @@
 
 
-const { NotFoundError, UnauthenticatedError } = require('../errors');
+const { NotFoundError, UnauthenticatedError, BadRequestError } = require('../errors');
 
 const {  storm_wallet } = require('../DB/models');
 
@@ -34,7 +34,9 @@ const createWallet = async (req, res) => {
     wallet_balance: 0,
   });
 
-  console.log(check_return)
+  if(!check_return){
+    throw new BadRequestError('unable to create wallet')
+  }
 
   res.send('wallet created')
 };

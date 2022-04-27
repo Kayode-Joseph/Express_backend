@@ -13,12 +13,19 @@ module.exports = (sequelize, DataTypes) => {
       // define association here
     }
   }
-  storm_wallet.init({
-    terminal_id:{ type:DataTypes.STRING, primaryKey:true, allowNull:false},
-    wallet_balance:{type: DataTypes.INTEGER, allowNull:false}
-  }, {
-    sequelize,
-    modelName: 'storm_wallet',
-  });
+  storm_wallet.init(
+    {
+      terminal_id: {
+        type: DataTypes.STRING,
+        primaryKey: true,
+        allowNull: false,
+      },
+      wallet_balance: { type: DataTypes.FLOAT, allowNull: false },
+    },
+    {
+      sequelize,
+      modelName: 'storm_wallet',
+    }
+  );
   return storm_wallet;
 };

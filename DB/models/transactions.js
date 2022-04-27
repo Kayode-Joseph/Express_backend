@@ -36,7 +36,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      
+
       acquiring_inst_code: {
         type: DataTypes.STRING,
       },
@@ -44,7 +44,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
       },
       amount: {
-        type: DataTypes.INTEGER,
+        type: DataTypes,
       },
       app_cryptogram: {
         type: DataTypes.STRING,
