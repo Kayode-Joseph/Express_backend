@@ -1,8 +1,8 @@
 'use strict';
 module.exports = {
   async up(queryInterface, DataTypes) {
-    await queryInterface.createTable('storm_wallets', {
-  id: {
+    await queryInterface.createTable('merchant_transaction_caches', {
+      id: {
         allowNull: false,
         autoIncrement: true,
         unique: true,
@@ -11,7 +11,6 @@ module.exports = {
       storm_id: {
         type: DataTypes.UUID,
         allowNull: false,
-        primaryKey: true,
         references: {
           model: 'users',
           key: 'storm_id',
@@ -19,18 +18,21 @@ module.exports = {
           onDelete: 'CASCADE',
         },
       },
-      
-      wallet_balance: {
+      rrn: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        primaryKey: true,
+        validator: { notNull: true },
+      },
+      amount: {
         type: DataTypes.FLOAT,
         allowNull: false,
         validator: { notNull: true, isDecimal: true },
       },
-      ledger_balance: {
-        type: DataTypes.FLOAT,
+      storm_id: {
+        type: DataTypes.STRING,
         allowNull: false,
-        validator: { notNull: true, isDecimal: true },
       },
-
       createdAt: {
         allowNull: false,
         type: DataTypes.DATE,
@@ -42,6 +44,6 @@ module.exports = {
     });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('storm_wallets');
+    await queryInterface.dropTable('merchant_transaction_caches');
   },
 };

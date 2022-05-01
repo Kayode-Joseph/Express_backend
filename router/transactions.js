@@ -1,12 +1,12 @@
-const authorize= require('../middleware/authentication')
+
 
 const express= require('express')
 
 const routers= express.Router()
 
-const {getOneTransactions, getTransactions, updateTransactionAndWalletBalance, getTransactionByDate}= require('../controllers/transactions')
+const {getOneTransactions , updateTransactionAndWalletBalance, getTransactionByDate}= require('../controllers/transactions')
 
-routers.route('/').get(getTransactions)
+//routers.route('/').get(getTransactions)
 
 
 routers.route('/date').post(getTransactionByDate);

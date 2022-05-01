@@ -2,12 +2,22 @@
 module.exports = {
   async up(queryInterface, DataTypes) {
     await queryInterface.createTable('transactions', {
-      // id: {
-      //   allowNull: false,
-      //   autoIncrement: true,
-      //   primaryKey: true,
-      //   type: DataTypes.INTEGER,
-      // },
+      id: {
+        allowNull: false,
+        autoIncrement: true,
+        unique: true,
+        type: DataTypes.INTEGER,
+      },
+      storm_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: 'users',
+          key: 'storm_id',
+          onUpdate: 'CASCADE',
+          onDelete: 'CASCADE',
+        },
+      },
       aid: {
         type: DataTypes.STRING,
       },
@@ -39,6 +49,7 @@ module.exports = {
       },
       amount: {
         type: DataTypes.FLOAT,
+        allowNull: false,
       },
       app_cryptogram: {
         type: DataTypes.STRING,
@@ -107,10 +118,20 @@ module.exports = {
       },
       transaction_type: {
         type: DataTypes.STRING,
+        allowNull: false,
       },
       transmission_date_time: {
         type: DataTypes.STRING,
       },
+      user_type: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+      transaction_status:{
+        allowNull:false,
+        type:DataTypes.STRING
+      },
+
       createdAt: {
         allowNull: false,
         type: DataTypes.DATE,

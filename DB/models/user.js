@@ -9,19 +9,37 @@ module.exports = (sequelize, DataTypes) => {
      * This method is not a part of Sequelize lifecycle.
      * The `models/index` file will call this method automatically.
      */
-    static associate(models) {
-      // define association here
+    static associate({
+      transactions,
+      storm_wallet,
+      merchant_transaction_cache,
+    }) {
+      this.hasMany(transactions, {
+        foreignKey: 'storm_id',
+        onUpdate: 'NO ACTION',
+        onDelete: 'NO ACTION',
+      });
+      this.hasOne(storm_wallet, {
+        foreignKey: 'storm_id',
+        onUpdate: 'NO ACTION',
+        onDelete: 'CASCADE',
+      });
+      this.hasMany(merchant_transaction_cache, {
+        foreignKey: 'storm_id',
+        onUpdate: 'NO ACTION',
+        onDelete: 'CASCADE',
+      });
     }
 
-    toJSON(){
-
-      return{...this.get(), id: undefined}
+    toJSON() {
+      return { ...this.get(), id: undefined };
     }
   }
   user.init(
     {
-      uuid: {
+      storm_id: {
         type: DataTypes.UUID,
+        primaryKey: true,
 
         defaultValue: DataTypes.UUIDV4,
       },
@@ -29,9 +47,60 @@ module.exports = (sequelize, DataTypes) => {
       email: {
         type: DataTypes.STRING,
         allowNull: false,
+        validate: {
+          isEmail: true,
+          notNull: true,
+        },
+        unique: true,
       },
-      password: DataTypes.STRING,
+      password: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        validator: { notNull: true },
+      },
+      business_name: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        validator: { notNull: true },
+      },
+      mobile_number: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        validator: { notNull: true },
+      },
+      account_number: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        validator: { notNull: true },
+      },
+      bvn: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        validator: { notNull: true },
+      },
+      type: {
+        type: DataTypes.ENUM('merchant', 'agent'),
+        validate: { isIn: [['merchant', 'agent']] },
+        allowNull: true,
+        defaultValue: 'agent',
+      },
+      terminal_id: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: null,
+      },
+      is_terminal_id: {
+        type: DataTypes.ENUM('true', 'false'),
+        allowNull: false,
+        defaultValue: 'false',
+      },
+      role: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        default: 'user',
+      },
     },
+
     {
       sequelize,
       modelName: 'user',

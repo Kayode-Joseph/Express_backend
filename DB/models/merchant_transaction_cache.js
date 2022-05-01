@@ -1,29 +1,32 @@
 'use strict';
-const { Model } = require('sequelize');
+const {
+  Model
+} = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
-  class storm_wallet extends Model {
+  class merchant_transaction_cache extends Model {
     /**
      * Helper method for defining associations.
      * This method is not a part of Sequelize lifecycle.
      * The `models/index` file will call this method automatically.
      */
-    static associate({ user }) {
+    static associate({user}) {
       this.belongsTo(user, { foreignKey: 'storm_id' });
     }
   }
-  storm_wallet.init(
+  merchant_transaction_cache.init(
     {
       storm_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        validator: { notNull: true },
+      },
+      rrn: {
         type: DataTypes.STRING,
         allowNull: false,
         primaryKey: true,
+        validator: { notNull: true },
       },
-      wallet_balance: {
-        type: DataTypes.FLOAT,
-        allowNull: false,
-        validator: { notNull: true, isDecimal: true },
-      },
-      ledger_balance: {
+      amount: {
         type: DataTypes.FLOAT,
         allowNull: false,
         validator: { notNull: true, isDecimal: true },
@@ -31,8 +34,8 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: 'storm_wallet',
+      modelName: 'merchant_transaction_cache',
     }
   );
-  return storm_wallet;
+  return merchant_transaction_cache;
 };

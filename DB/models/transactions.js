@@ -8,14 +8,19 @@ module.exports = (sequelize, DataTypes) => {
      * This method is not a part of Sequelize lifecycle.
      * The `models/index` file will call this method automatically.
      */
-    static associate(models) {
+    static associate({user}) {
       // define association here
+      this.belongsTo(user, {foreignKey: 'storm_id'})
     }
   }
   transactions.init(
     {
       aid: {
         type: DataTypes.STRING,
+      },
+      storm_id: {
+        type: DataTypes.STRING,
+        allowNull: false,
       },
       rrn: {
         primaryKey: true,
@@ -44,7 +49,9 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
       },
       amount: {
-        type: DataTypes,
+        type: DataTypes.FLOAT,
+        allowNull: false,
+        validator: { notNull: true, isDecimal: true },
       },
       app_cryptogram: {
         type: DataTypes.STRING,
@@ -90,9 +97,11 @@ module.exports = (sequelize, DataTypes) => {
       },
       transaction_type: {
         type: DataTypes.STRING,
+        allowNull: false,
       },
       other_amount: {
         type: DataTypes.INTEGER,
+        allowNull: false,
       },
       other_id: {
         type: DataTypes.STRING,
@@ -107,6 +116,7 @@ module.exports = (sequelize, DataTypes) => {
       terminal_id: {
         type: DataTypes.STRING,
         allowNull: false,
+        unique: true,
       },
       transaction_time_in_mills: {
         type: DataTypes.INTEGER,
@@ -115,6 +125,15 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
       },
       transmission_date_time: {
+        type: DataTypes.STRING,
+      },
+      user_type: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        validator: { notNull: true },
+      },
+      transaction_status: {
+        allowNull: false,
         type: DataTypes.STRING,
       },
     },

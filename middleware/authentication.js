@@ -3,7 +3,7 @@ const { UnauthenticatedError}= require('../errors')
 
 const authorize=(req,res, next)=>{
 
-if (req.headers.authorization != process.env.KEY) {
+if (req.headers.api_key != process.env.KEY) {
   throw new UnauthenticatedError('UNAUTHORIZED');
 }
 
