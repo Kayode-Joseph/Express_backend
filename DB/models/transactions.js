@@ -8,13 +8,19 @@ module.exports = (sequelize, DataTypes) => {
      * This method is not a part of Sequelize lifecycle.
      * The `models/index` file will call this method automatically.
      */
-    static associate({user}) {
+    static associate({ user }) {
       // define association here
-      this.belongsTo(user, {foreignKey: 'storm_id'})
+      this.belongsTo(user, { foreignKey: 'storm_id' });
     }
   }
   transactions.init(
     {
+      id: {
+        allowNull: true,
+        autoIncrement: true,
+        unique: true,
+        type: DataTypes.INTEGER,
+      },
       aid: {
         type: DataTypes.STRING,
       },
@@ -72,10 +78,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      id: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-      },
+     
       local_date_13: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -133,6 +136,15 @@ module.exports = (sequelize, DataTypes) => {
         validator: { notNull: true },
       },
       transaction_status: {
+        allowNull: false,
+        type: DataTypes.ENUM('approved', 'declined'),
+        validate: { isIn: [['approved', 'declined']] },
+      },
+      settlement_status: {
+        allowNull: false,
+        type: DataTypes.STRING,
+      },
+      routing_channel: {
         allowNull: false,
         type: DataTypes.STRING,
       },

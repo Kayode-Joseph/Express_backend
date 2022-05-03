@@ -70,10 +70,7 @@ module.exports = {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      id: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-      },
+
       local_date_13: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -127,9 +124,17 @@ module.exports = {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      transaction_status:{
-        allowNull:false,
-        type:DataTypes.STRING
+      transaction_status: {
+        allowNull: false,
+        type: DataTypes.ENUM('approved', 'declined'),
+      },
+      settlement_status: {
+        allowNull: false,
+        type: DataTypes.STRING,
+      },
+      routing_channel: {
+        allowNull: false,
+        type: DataTypes.STRING,
       },
 
       createdAt: {

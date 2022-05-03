@@ -2,7 +2,7 @@
 module.exports = {
   async up(queryInterface, DataTypes) {
     await queryInterface.createTable('storm_wallets', {
-  id: {
+      id: {
         allowNull: false,
         autoIncrement: true,
         unique: true,
@@ -19,7 +19,7 @@ module.exports = {
           onDelete: 'CASCADE',
         },
       },
-      
+
       wallet_balance: {
         type: DataTypes.FLOAT,
         allowNull: false,

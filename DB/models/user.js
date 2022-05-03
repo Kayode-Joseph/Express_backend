@@ -79,10 +79,10 @@ module.exports = (sequelize, DataTypes) => {
         validator: { notNull: true },
       },
       type: {
-        type: DataTypes.ENUM('merchant', 'agent'),
-        validate: { isIn: [['merchant', 'agent']] },
+        type: DataTypes.ENUM('merchant', 'agent_1','agent_2'),
+        validate: { isIn: [['merchant', 'agent_1', 'agent_2']] },
         allowNull: true,
-        defaultValue: 'agent',
+        defaultValue: 'agent_2',
       },
       terminal_id: {
         type: DataTypes.STRING,
