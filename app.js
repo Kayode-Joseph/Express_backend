@@ -96,7 +96,7 @@ app.listen(process.env.PORT || 3000, async () => {
     console.log('sever started on port ' + process.env.PORT);
 
     //update merchant transaction at 12pm everday
-    cron.schedule(' 0 12 * * *', async () => {
+    cron.schedule('0 12 * * *', async () => {
       console.log('log');
 
       const date_in_millis = new Date().getTime();
@@ -133,7 +133,7 @@ app.listen(process.env.PORT || 3000, async () => {
           });
 
           await transactions.update(
-            { transaction_status: 'completed' },
+            { settlement_status: 'completed' },
             {
               where: {
                 rrn: transaction.rrn,

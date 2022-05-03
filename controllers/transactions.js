@@ -1,8 +1,10 @@
-
-
 const { Op } = require('sequelize');
 
-const { NotFoundError, UnauthenticatedError, BadRequestError } = require('../errors');
+const {
+  NotFoundError,
+  UnauthenticatedError,
+  BadRequestError,
+} = require('../errors');
 
 const {
   user,
@@ -11,15 +13,13 @@ const {
   merchant_transaction_cache,
 } = require('../DB/models');
 
- //admin operation get all database transactions
-
+//admin operation get all database transactions
 
 const updateTransactionAndWalletBalance = async (req, res) => {
-  
-  const {userId}= req.user
+  const { userId } = req.user;
 
-  if (!userId){
-    throw new UnauthenticatedError('UNAUTHORIZED')
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
   }
 
   const {
@@ -38,7 +38,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     cardExpiry,
     cardHolder,
     cardLabel,
-    id,
+    
     localDate_13,
     localTime_12,
     maskedPan,
@@ -52,26 +52,25 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     transactionTimeInMillis,
     transactionType,
     transmissionDateTime,
-    userType
-    
+    userType,
+    transactionStatus,
+    routingChannel,
   } = req.body;
 
-  if (stormId!=userId){
-
-throw new UnauthenticatedError("UNAUTHORIZED")
+  if (stormId != userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
   }
 
   if (!userType) {
-    throw new BadRequestError('user tpe not sepecified');
+    throw new BadRequestError('user type not sepecified');
   }
 
-
-
-
-  
+  if (!transactionStatus) {
+    throw new BadRequestError('transaction status not sepecified');
+  }
 
   //logging the transaction
-  const created_transaction=await transactions.create({
+  const created_transaction = await transactions.create({
     storm_id: stormId,
     aid: AID,
     rrn: RRN,
@@ -87,7 +86,7 @@ throw new UnauthenticatedError("UNAUTHORIZED")
     card_expiry: cardExpiry,
     card_holder: cardHolder,
     card_label: cardLabel,
-    id: id,
+    
     local_date_13: localDate_13,
     local_date_12: localTime_12,
     masked_pan: maskedPan,
@@ -101,119 +100,125 @@ throw new UnauthenticatedError("UNAUTHORIZED")
     terminal_id: terminalId,
     transaction_time_in_mills: transactionTimeInMillis,
     transmission_date_time: transmissionDateTime,
-    transaction_status: 'pending',
-    user_type: userType
+    settlement_status: 'pending',
+    user_type: userType,
+    transaction_status: transactionStatus,
+    routing_channel: routingChannel,
   });
 
-  
+  if (transactionStatus === 'declined') {
+    res.status(200).json({ msg: 'transaction logged' });
+    created_transaction.settlement_status='completed'
+    await created_transaction.save({ fields: ['settlement_status'] });
 
 
-  
+    return;
+  }
 
   //updating storm wallet
 
-const owner_of_storm_wallet = await storm_wallet.findOne({
-  //attributes: ['wallet_balance'],
-  where:{
-
-    storm_id: stormId
-  }
-});
-
-if(!owner_of_storm_wallet){
-
-  throw new NotFoundError('user not found in storm database')
-}
-
-console.log(owner_of_storm_wallet)
-
-if(userType=='agent'){
-
-const new_wallet_balance= owner_of_storm_wallet.dataValues.wallet_balance
-
-console.log('amount'+amount)
-
-const new_wallet_balance_95_percent= new_wallet_balance+ amount*0.95
-
-console.log(new_wallet_balance_95_percent)
-
- console.log("ledger "+owner_of_storm_wallet.wallet_balance);
-
- owner_of_storm_wallet.ledger_balance = new_wallet_balance_95_percent;
-
- owner_of_storm_wallet.wallet_balance = new_wallet_balance_95_percent;
-
-
-
- await owner_of_storm_wallet.save({
-   fields: ['ledger_balance', 'wallet_balance'],
- });
-
- created_transaction.transaction_status= 'completed'
-
- await created_transaction.save({fields:['transaction_status']})
-
-   res.send('transaction created and wallet updated');
-
-}
-
-else if (userType==='merchant'){
-
-  const new_wallet_balance = owner_of_storm_wallet.dataValues.wallet_balance;
-
-  console.log('amount' + amount);
-
-  const new_wallet_balance_95_percent = new_wallet_balance + amount * 0.95;
-
-  console.log(new_wallet_balance_95_percent);
-
-  owner_of_storm_wallet.ledger_balance = new_wallet_balance_95_percent;
-
-  await owner_of_storm_wallet.save({
-    fields: ['ledger_balance'],
+  const owner_of_storm_wallet = await storm_wallet.findOne({
+    //attributes: ['wallet_balance'],
+    where: {
+      storm_id: stormId,
+    },
   });
 
-  const trans_cache=await merchant_transaction_cache.create({
-    rrn: RRN,
-    amount: amount,
-    storm_id:stormId
-  })
-
-  if(!trans_cache){
-    throw new Error('something went wrong')
+  if (!owner_of_storm_wallet) {
+    throw new NotFoundError('user not found in storm database');
   }
 
-  res.send('transaction created');
+  if (userType.includes('agent')) {
+    let amount_to_credit = null;
 
-}
+    if (amount >= 20000) {
+      amount_to_credit = amount-120;
+    }
 
+    else if (amount < 20000 && userType === 'agent_1') {
+      amount_to_credit = amount * 0.9945;
+    } 
+    else if (amount < 20000 && userType === 'agent_2') {
+      amount_to_credit = amount * 0.9935;
+    } else {
+      throw new BadRequestError('invalid user type');
+    }
 
+    const new_wallet_balance = owner_of_storm_wallet.dataValues.wallet_balance;
 
-// const erro =await transactions.update({
-// wallet_balance: new_wallet_balance_95_percent
+    console.log('amount' + amount_to_credit);
 
-// }, {where:{
+    owner_of_storm_wallet.ledger_balance =
+      new_wallet_balance + amount_to_credit;
 
-//     terminal_id: terminalId
-//   }})
+    owner_of_storm_wallet.wallet_balance =
+      new_wallet_balance + amount_to_credit;
+
+    await owner_of_storm_wallet.save({
+      fields: ['ledger_balance', 'wallet_balance'],
+    });
+
+    created_transaction.settlement_status = 'completed';
+
+    await created_transaction.save({ fields: ['settlement_status'] });
+
+    res.send('transaction created and wallet updated');
+  } else if (userType === 'merchant') {
+    const wallet_balance = owner_of_storm_wallet.dataValues.wallet_balance;
+
+    let amount_to_credit = amount * 0.9935;
+
+    if (amount_to_credit > 1000) {
+      amount_to_credit = amount-1000;
+    }
+
+    const new_wallet_balance = wallet_balance + amount_to_credit;
+
+    console.log(new_wallet_balance);
+
+    owner_of_storm_wallet.ledger_balance = new_wallet_balance;
+
+    await owner_of_storm_wallet.save({
+      fields: ['ledger_balance'],
+    });
+
+    const trans_cache = await merchant_transaction_cache.create({
+      rrn: RRN,
+      amount: amount,
+      storm_id: stormId,
+    });
+
+    if (!trans_cache) {
+      throw new Error('something went wrong');
+    }
+
+    res.send('transaction created');
+  }
+
+  // const erro =await transactions.update({
+  // wallet_balance: new_wallet_balance_95_percent
+
+  // }, {where:{
+
+  //     terminal_id: terminalId
+  //   }})
 
   //transactions.save()
 
-  
   // await storm_wallet.create({
   //   terminal_id: terminalId,
   //   wallet_balance: amount,
   // });
-
-  console.log('transaction updated');
-
-
+  else {
+    throw new BadRequestError('invalid user type');
+  }
 };
+
 
 const getOneTransactions = async (req, res) => {
   const trans_id = req.params.rrn;
 
- const {userId}= req.user
+  const { userId } = req.user;
 
   console.log(trans_id);
 
@@ -230,54 +235,46 @@ const getOneTransactions = async (req, res) => {
   if (transaction.dataValues.storm_id != userId) {
     throw new UnauthenticatedError('UNAUTHORIZED');
   }
-  res.status(200).json({transaction});
+  res.status(200).json({ transaction });
 };
 
- //admin operation get all database transactions for a date range
+//admin operation get all database transactions for a date range
 
 const getTransactionByDate = async (req, res) => {
-
- 
-
-
   const { userId } = req.user;
 
-     if (!userId) {
-       throw new UnauthenticatedError('UNAUTHORIZED');
-     }
-
- 
-  const { dateLowerBound, dateUpperBound, storm_id } = req.body;
-
-
-
-  if (userId!= storm_id){
-
-    throw new UnauthenticatedError("NOT AUTHORIZED")
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
   }
 
+  const { dateLowerBound, dateUpperBound, storm_id } = req.body;
 
-
-
+  if (userId != storm_id) {
+    throw new UnauthenticatedError('NOT AUTHORIZED');
+  }
 
   console.log(dateUpperBound);
   //month first in req body
 
-  const dateLowerBound_in_milliseconds = new Date(dateLowerBound + ' 00:00').getTime();
+  const dateLowerBound_in_milliseconds = new Date(
+    dateLowerBound + ' 00:00'
+  ).getTime();
 
+  const dateUpperBound_in_milliseconds = new Date(
+    dateUpperBound + ' 00:00'
+  ).getTime();
 
+  console.log(dateUpperBound_in_milliseconds);
 
-  const dateUpperBound_in_milliseconds = new Date(dateUpperBound + ' 00:00').getTime() ;
-
-    console.log(dateUpperBound_in_milliseconds);
-
-  console.log('date lupper millis'+ dateUpperBound_in_milliseconds)
+  console.log('date lupper millis' + dateUpperBound_in_milliseconds);
 
   const dateToGetLower = new Date(dateLowerBound_in_milliseconds);
 
-  const dateToGetUpper = new Date(dateUpperBound_in_milliseconds +86400 *1000);
+  const dateToGetUpper = new Date(
+    dateUpperBound_in_milliseconds + 86400 * 1000
+  );
 
-  console.log('date'+dateToGetLower)
+  console.log('date' + dateToGetLower);
 
   console.log(dateToGetUpper);
 
@@ -287,7 +284,7 @@ const getTransactionByDate = async (req, res) => {
         [Op.lt]: dateToGetUpper,
         [Op.gt]: dateToGetLower,
       },
-      storm_id: userId
+      storm_id: userId,
     },
   });
   res.send(transaction);
@@ -297,7 +294,7 @@ const getTransactionByDate = async (req, res) => {
 
 module.exports = {
   getOneTransactions,
- 
+
   updateTransactionAndWalletBalance,
   getTransactionByDate,
 };
