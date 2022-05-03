@@ -4,6 +4,13 @@ const { Op } = require('sequelize');
 
 const express = require('express');
 
+const cluster= require('cluster')
+
+const os= require('os')
+
+const numCpu= os.cpus().length
+
+
 const {
   merchant_transaction_cache,
   transactions,
@@ -47,15 +54,15 @@ const { sequelize, user } = require('./DB/models');
 
 const app = express();
 
-// logger.token('myLogger', (req, res)=>{
-//   console.log(res)
-// })
+logger.token('PID', (req, res)=>{
+return 'thread:'+process.pid
+ })
 
 const logfile = fs.createWriteStream(path.join(__dirname, 'logfile'), {
   flags: 'a',
 });
 app.use(
-  logger(':status :url :method :date[clf] :res[content-length]', {
+  logger(':status :url :method :date[clf] :res[content-length] :PID', {
     stream: logfile,
   })
 );
@@ -90,10 +97,27 @@ app.get('/', (req, res) => {
 app.use(notFoundMiddleware);
 app.use(errorHandlerMiddleware);
 
+if(cluster.isMaster){
+
+  for(let i=0; i<numCpu; i++){
+
+    cluster.fork()
+  }
+  cluster.on('exit', (worker, code, signal)=>{
+
+  console.log('worker thread instance '+process.pid+ 'has crashed')
+  cluster.fork()
+
+
+
+  })
+
+}
+else{
 app.listen(process.env.PORT || 3000, async () => {
   try {
     await sequelize.authenticate();
-    console.log('sever started on port ' + process.env.PORT);
+    console.log('sever started on port ' + process.env.PORT + "thread: "+process.pid);
 
     //update merchant transaction at 12pm everday
     cron.schedule('0 12 * * *', async () => {
@@ -154,4 +178,6 @@ app.listen(process.env.PORT || 3000, async () => {
     console.log('unable to connect to database');
     console.log(e);
   }
-});
+})
+
+};

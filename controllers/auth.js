@@ -38,7 +38,7 @@ const login = async (req, res) => {
       const token = jwt.sign(
         { stormId: storm_id},
         process.env.SECRET,
-        { expiresIn: '30m' }
+        { expiresIn: '1d' }
       );
 
       delete user_that_want_to_login.dataValues.password
@@ -65,6 +65,10 @@ const login = async (req, res) => {
 const register= async (req,res)=>{
 
 const {email, password, businessName, mobileNumber, accountNumber, bvn,  userType}= req.body
+
+if(!password||!email||!businessName||!mobileNumber||!accountNumber||!bvn||!userType){
+  throw new BadRequestError('missing field')
+}
 
 const salt= await bcrypt.genSalt(10)
 
@@ -113,7 +117,7 @@ const stormId= new_user.dataValues.storm_id
 let token= null
  try {
    token = jwt.sign({ stormId: stormId }, process.env.SECRET, {
-     expiresIn: '30m',
+     expiresIn: '1d',
    });
 
    
