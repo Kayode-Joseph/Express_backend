@@ -164,15 +164,18 @@ const updateTransactionAndWalletBalance = async (req, res) => {
 
     res.send('transaction created and wallet updated');
   } else if (userType === 'merchant') {
-    const wallet_balance = owner_of_storm_wallet.dataValues.wallet_balance;
+    const ledger_balance = owner_of_storm_wallet.dataValues.ledger_balance;
+
+  
 
     let amount_to_credit = amount * 0.9935;
 
-    if (amount_to_credit > 1000) {
-      amount_to_credit = amount-1000;
+    //when 0.9935
+    if (amount > 153846.154) {
+    amount_to_credit = amount-1000;
     }
 
-    const new_wallet_balance = wallet_balance + amount_to_credit;
+    const new_wallet_balance = ledger_balance + amount_to_credit;
 
     console.log(new_wallet_balance);
 

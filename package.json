@@ -7,8 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node app.js",
     "undo": "../node_modules/.bin/sequelize db:migrate:undo:all",
-    "loadtest_register":"loadtest -H \"api_key:123456\" -p TEST/req_body_for_register.js -T application/json -m POST -n 200 -c 10 http://localhost:3000/api/v1/auth/register "  ,
-    "loadtest_transaction":"loadtest -H \"api_key:123456\" -H \"Authorization:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdG9ybUlkIjoiYjEyNGU4MzAtODYyMS00N2VjLTliNzctZWM2ZGNmODJmM2U5IiwiaWF0IjoxNjUxNTkyMzQ3LCJleHAiOjE2NTE1OTQxNDd9.ytiDEjX4Gzp1w1tS_1stwadV6u9h9rgzTUQaQwjs6oM\" -p TEST/req_body_for_transaction_endpoint.js -T application/json -m POST -n 200 -c 10 http://localhost:3000/api/v1/transaction/e7a8c427-d88a-4504-9e53-31be114ddd66" 
+    "loadtest_register": "loadtest -H \"api_key:123456\" -p TEST/req_body_for_register.js -T application/json -m POST -n 200 -c 10 http://localhost:3000/api/v1/auth/register ",
+    "loadtest_transaction": "loadtest -H \"api_key:123456\" -H \"Authorization:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdG9ybUlkIjoiYjEyNGU4MzAtODYyMS00N2VjLTliNzctZWM2ZGNmODJmM2U5IiwiaWF0IjoxNjUxNTkyMzQ3LCJleHAiOjE2NTE1OTQxNDd9.ytiDEjX4Gzp1w1tS_1stwadV6u9h9rgzTUQaQwjs6oM\" -p TEST/req_body_for_transaction_endpoint.js -T application/json -m POST -n 200 -c 10 http://localhost:3000/api/v1/transaction/e7a8c427-d88a-4504-9e53-31be114ddd66"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +27,7 @@
     "morgan": "^1.10.0",
     "mysql2": "^2.3.3",
     "node-cron": "^3.0.0",
+    "nodemailer": "^6.7.5",
     "nodemon": "^2.0.15",
     "sequelize": "^6.19.0",
     "sequelize-cli": "^6.4.1",
