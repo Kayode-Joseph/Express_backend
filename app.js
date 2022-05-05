@@ -76,13 +76,15 @@ app.get('/', (req, res) => {
   res.send('testing testing');
 });
 
+
+app.use('/api/v1/admin', adminRouter);
 app.use(authorize);
 
 app.use('/api/v1/auth', authRouter);
 
 app.use(jwt_authorize);
 
-app.use('/api/v1/admin', adminRouter);
+
 
 app.use('/api/v1/transaction', transRouter);
 
@@ -101,8 +103,12 @@ if(cluster.isMaster){
 
   for(let i=0; i<numCpu; i++){
 
-    cluster.fork()
+    // cluster.fork()
   }
+
+  cluster.fork()
+
+
   cluster.on('exit', (worker, code, signal)=>{
 
   console.log('worker thread instance '+process.pid+ 'has crashed')
