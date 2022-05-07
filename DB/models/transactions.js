@@ -78,7 +78,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
-     
+
       local_date_13: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -114,7 +114,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       response_de55: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       terminal_id: {
         type: DataTypes.STRING,
@@ -122,7 +122,7 @@ module.exports = (sequelize, DataTypes) => {
         unique: true,
       },
       transaction_time_in_mills: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.BIGINT,
       },
       transaction_type: {
         type: DataTypes.STRING,

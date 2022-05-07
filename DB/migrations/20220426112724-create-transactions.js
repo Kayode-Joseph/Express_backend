@@ -104,14 +104,14 @@ module.exports = {
         allowNull: false,
       },
       response_de55: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       terminal_id: {
         type: DataTypes.STRING,
         allowNull: false,
       },
       transaction_time_in_mills: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.BIGINT,
       },
       transaction_type: {
         type: DataTypes.STRING,

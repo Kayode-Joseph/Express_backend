@@ -18,6 +18,8 @@ const {
 const updateTransactionAndWalletBalance = async (req, res) => {
   const { userId } = req.user;
 
+  const storm_id_param= req.params.stormId
+
   if (!userId) {
     throw new UnauthenticatedError('UNAUTHORIZED');
   }
@@ -57,7 +59,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     routingChannel,
   } = req.body;
 
-  if (stormId != userId) {
+  if (stormId != userId || storm_id_param != userId) {
     throw new UnauthenticatedError('UNAUTHORIZED');
   }
 

@@ -64,6 +64,8 @@ const login = async (req, res) => {
  
 const register= async (req,res)=>{
 
+  console.log('yessir')
+
 const {email, password, businessName, mobileNumber, accountNumber, bvn,  userType}= req.body
 
 if(!password||!email||!businessName||!mobileNumber||!accountNumber||!bvn||!userType){

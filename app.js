@@ -51,6 +51,7 @@ const xss_clean = require('xss-clean');
 const cors = require('cors');
 
 const { sequelize, user } = require('./DB/models');
+const { header } = require('express/lib/response');
 
 const app = express();
 
@@ -71,13 +72,17 @@ app.use(helmet());
 app.use(cors());
 app.use(xss_clean());
 
+
 //testing
 app.get('/', (req, res) => {
   res.send('testing testing');
 });
 
 
+
+
 app.use('/api/v1/admin', adminRouter);
+
 app.use(authorize);
 
 app.use('/api/v1/auth', authRouter);
@@ -103,10 +108,10 @@ if(cluster.isMaster){
 
   for(let i=0; i<numCpu; i++){
 
-    //  cluster.fork()
+    cluster.fork()
   }
 
-   cluster.fork()
+  //  cluster.fork()
 
 
   cluster.on('exit', (worker, code, signal)=>{

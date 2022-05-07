@@ -11,7 +11,7 @@ const {getOneTransactions , updateTransactionAndWalletBalance, getTransactionByD
 
 routers.route('/date').post(getTransactionByDate);
 
-routers.route('/:rrn').post(updateTransactionAndWalletBalance).get(getOneTransactions)
+routers.route('/:stormId').post(updateTransactionAndWalletBalance).get(getOneTransactions)
 
 
 module.exports=routers

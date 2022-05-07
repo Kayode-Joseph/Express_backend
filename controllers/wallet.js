@@ -18,7 +18,7 @@ const getBalance = async (req, res) => {
 
 
   const balance =await storm_wallet.findOne({
-        attributes:['wallet_balance'],
+        attributes:['wallet_balance', 'ledger_balance'],
         where:{
           storm_id: stormId
         }
