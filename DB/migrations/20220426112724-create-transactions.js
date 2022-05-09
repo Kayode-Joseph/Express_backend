@@ -48,7 +48,7 @@ module.exports = {
         type: DataTypes.STRING,
       },
       amount: {
-        type: DataTypes.FLOAT,
+        type: DataTypes.DOUBLE,
         allowNull: false,
       },
       app_cryptogram: {

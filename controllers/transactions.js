@@ -11,6 +11,7 @@ const {
   transactions,
   storm_wallet,
   merchant_transaction_cache,
+  transaction_fees,
 } = require('../DB/models');
 
 //admin operation get all database transactions
@@ -40,7 +41,6 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     cardExpiry,
     cardHolder,
     cardLabel,
-    
     localDate_13,
     localTime_12,
     maskedPan,
@@ -69,6 +69,15 @@ const updateTransactionAndWalletBalance = async (req, res) => {
 
   if (!transactionStatus) {
     throw new BadRequestError('transaction status not sepecified');
+  }
+
+  const user_type= await user.findOne({
+    attributes:['type']
+  })
+
+  if(user_type.dataValues.type!=userType){
+
+    throw new BadRequestError('userType mismatch')
   }
 
   //logging the transaction
@@ -117,6 +126,25 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     return;
   }
 
+
+  const transactionFee= await transaction_fees.findOne({
+
+where:{
+
+  agent_type: userType
+}
+
+  })
+
+  if(!transactionFee){
+
+    throw BadRequestError('wrong user type')
+  }
+
+
+
+
+
   //updating storm wallet
 
   const owner_of_storm_wallet = await storm_wallet.findOne({
@@ -133,15 +161,15 @@ const updateTransactionAndWalletBalance = async (req, res) => {
   if (userType.includes('agent')) {
     let amount_to_credit = null;
 
-    if (amount >= 20000) {
-      amount_to_credit = amount-120;
+    if (amount >= transactionFee.dataValues.max_debit_amount) {
+      amount_to_credit = amount-transactionFee.dataValues.cap;
     }
 
-    else if (amount < 20000 && userType === 'agent_1') {
-      amount_to_credit = amount * 0.9945;
-    } 
-    else if (amount < 20000 && userType === 'agent_2') {
-      amount_to_credit = amount * 0.9935;
+    else if (amount < transactionFee.dataValues.max_debit_amount && userType === 'agent_1') {
+      amount_to_credit = amount * transactionFee.dataValues.transaction_percentage;
+    } else if (amount < transactionFee.dataValues.max_debit_amount && userType === 'agent_2') {
+      amount_to_credit =
+        amount * transactionFee.dataValues.transaction_percentage;
     } else {
       throw new BadRequestError('invalid user type');
     }
@@ -170,11 +198,12 @@ const updateTransactionAndWalletBalance = async (req, res) => {
 
   
 
-    let amount_to_credit = amount * 0.9935;
+    let amount_to_credit = amount * transactionFee.dataValues.transaction_percentage;
 
     //when 0.9935
-    if (amount > 153846.154) {
-    amount_to_credit = amount-1000;
+    if (amount > transactionFee.dataValues.max_debit_amount) {
+      amount_to_credit =
+        amount - transactionFee.dataValues.cap;
     }
 
     const new_wallet_balance = ledger_balance + amount_to_credit;
@@ -200,20 +229,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     res.send('transaction created');
   }
 
-  // const erro =await transactions.update({
-  // wallet_balance: new_wallet_balance_95_percent
 
-  // }, {where:{
-
-  //     terminal_id: terminalId
-  //   }})
-
-  //transactions.save()
-
-  // await storm_wallet.create({
-  //   terminal_id: terminalId,
-  //   wallet_balance: amount,
-  // });
   else {
     throw new BadRequestError('invalid user type');
   }

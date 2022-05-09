@@ -1,34 +1,40 @@
 'use strict';
 module.exports = {
   async up(queryInterface, DataTypes) {
-    await queryInterface.createTable('storm_wallets', {
+    await queryInterface.createTable('transaction_fees', {
       id: {
         allowNull: false,
         autoIncrement: true,
-        unique: true,
+        primaryKey: true,
         type: DataTypes.INTEGER,
       },
-      storm_id: {
-        type: DataTypes.UUID,
+
+      agent_type: {
+        type: DataTypes.STRING,
         allowNull: false,
-        primaryKey: true,
-        references: {
-          model: 'users',
-          key: 'storm_id',
-          onUpdate: 'CASCADE',
-          onDelete: 'CASCADE',
-        },
+        unique: true,
+      },
+      transaction_percentage: {
+        type: DataTypes.DOUBLE,
+
+        allowNull: false,
+      },
+      cap: {
+        type: DataTypes.DOUBLE,
+
+        allowNull: false,
       },
 
-      wallet_balance: {
+      transfer_out_fee: {
         type: DataTypes.DOUBLE,
+
         allowNull: false,
-        validator: { notNull: true, isDecimal: true },
       },
-      ledger_balance: {
+
+      max_debit_amount: {
         type: DataTypes.DOUBLE,
+
         allowNull: false,
-        validator: { notNull: true, isDecimal: true },
       },
 
       createdAt: {
@@ -42,6 +48,6 @@ module.exports = {
     });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('storm_wallets');
+    await queryInterface.dropTable('transaction_fees');
   },
 };

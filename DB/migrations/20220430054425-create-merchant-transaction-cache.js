@@ -25,7 +25,7 @@ module.exports = {
         validator: { notNull: true },
       },
       amount: {
-        type: DataTypes.FLOAT,
+        type: DataTypes.DOUBLE,
         allowNull: false,
         validator: { notNull: true, isDecimal: true },
       },

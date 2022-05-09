@@ -57,22 +57,18 @@ const transactions_tracker = async () => {
 };
 
 const transactionsTrackerRoute = async (req, res) => {
+  const { userId } = req.user;
 
-  const {userId}= req.user
-
-  if(!userId){
-
-    throw new UnauthenticatedError('not authorized')
+  if (!userId) {
+    throw new UnauthenticatedError('not authorized');
   }
-  
 
-  
-  
   const [transaction_count, transaction_value] = await transactions_tracker();
 
-  res.status(200).json({transaction_count: transaction_count, transaction_value:transaction_value})
-
-
+  res.status(200).json({
+    transaction_count: transaction_count,
+    transaction_value: transaction_value,
+  });
 };
 
 const addTerminalId = async (req, res) => {
@@ -81,7 +77,6 @@ const addTerminalId = async (req, res) => {
   if (!userId) {
     throw new UnauthenticatedError('UNAUTHORIZED');
   }
-
 
   const { stormId, terminalId } = req.body;
 
@@ -104,36 +99,40 @@ const addTerminalId = async (req, res) => {
   res.send('terminal id updated');
 };
 
+const getStormUsers = async (req, res) => {
+  const { userId } = req.user;
 
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
 
-
-const getStormUsers = async (req,res) => {
-  
-   const { userId } = req.user;
-
-   if (!userId) {
-     throw new UnauthenticatedError('UNAUTHORIZED');
-   }
-
-  
   const page = req.query.page;
 
-  if(!page){
-    throw new BadRequestError('query param page is missing')
+  const stormId = req.query.stormId;
+
+  if (!page) {
+    throw new BadRequestError('query param page is missing');
   }
-  if(isNaN(page)){
-
-        throw new BadRequestError('query param page must be a number');
+  if (isNaN(page)) {
+    throw new BadRequestError('query param page must be a number');
   }
 
-  const users = await user.findAll({
-    attributes:['business_name', 'email', 'mobile_number', 'storm_id'],
-    offset: 20 * page,
-    limit: 20,
-  });
+  const users = stormId
+    ? await user.findOne({
+        attributes: ['business_name', 'email', 'mobile_number', 'storm_id'],
+        offset: 20 * page,
+        limit: 20,
+        where: {
+          storm_id: stormId,
+        },
+      })
+    : await user.findAll({
+        attributes: ['business_name', 'email', 'mobile_number', 'storm_id'],
+        offset: 20 * page,
+        limit: 20,
+      });
 
-  res.status(200).send(users)
-
+  res.status(200).send(users);
 };
 
 const getTransactions = async (req, res) => {
@@ -144,6 +143,10 @@ const getTransactions = async (req, res) => {
 
   const page = req.query.page;
 
+  const stormId= req.query.stormId
+
+  const rrn= req.query.rrn
+
   if (!page) {
     throw new BadRequestError('query param page is missing');
   }
@@ -151,14 +154,43 @@ const getTransactions = async (req, res) => {
     throw new BadRequestError('query param page must be a number');
   }
 
- 
+  const transaction_list = rrn
+    ? await transactions.findOne({
+        attributes: [
+          'storm_id',
+          'rrn',
+          'amount',
+          'createdAt',
+          'settlement_status',
+          'transaction_status',
+        ],
+        offset: 20 * page,
+        limit: 20,
 
-  const transaction_list = await transactions.findAll({
-    attributes:['rrn', 'amount','createdAt', 'settlement_status', 'transaction_status'],
+        where: {
 
-    offset: 20 * page,
-    limit: 20,
-  });
+          rrn: rrn
+        }
+      })
+    : await transactions.findAll({
+        attributes: [
+          'storm_id',
+          'rrn',
+          'amount',
+          'createdAt',
+          'settlement_status',
+          'transaction_status',
+        ],
+
+        offset: 20 * page,
+        limit: 20,
+
+        where: stormId
+          ? {
+              storm_id: stormId,
+            }
+          : undefined,
+      }); 
 
   res.send(transaction_list);
 };
@@ -306,8 +338,13 @@ const adminLogin = async (req, res) => {
   }
 
   const user_that_want_to_login = await admin.findOne({
-
-     attributes: ['email', 'admin_id', 'business_name', 'mobile_number', 'password'],
+    attributes: [
+      'email',
+      'admin_id',
+      'business_name',
+      'mobile_number',
+      'password',
+    ],
     where: {
       email: email,
     },
@@ -346,6 +383,7 @@ const adminLogin = async (req, res) => {
 
   const [transaction_count, transaction_value] = await transactions_tracker();
 
+  delete user_that_want_to_login.dataValues.password;
   res.status(201).json({
     admin: user_that_want_to_login,
     token: token,
