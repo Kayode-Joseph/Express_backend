@@ -56,6 +56,12 @@ module.exports = {
         type: DataTypes.STRING,
         allowNull: true,
         defaultValue: null,
+        references: {
+          model: 'terminal_ids',
+          key: 'terminal_id',
+          onUpdate: 'CASCADE',
+          onDelete: 'CASCADE',
+        },
       },
       is_terminal_id: {
         type: DataTypes.ENUM('true', 'false'),

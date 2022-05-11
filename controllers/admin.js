@@ -12,6 +12,7 @@ const {
   storm_wallet,
   superadmin,
   admin,
+  terminal_id
 } = require('../DB/models');
 
 const bcrypt = require('bcrypt');
@@ -81,6 +82,7 @@ const addTerminalId = async (req, res) => {
   const { stormId, terminalId } = req.body;
 
   const user_to_update = await user.findOne({
+     attributes:['storm_id', 'email','password', 'business_name', 'mobile_number', 'account_number', 'type','createdAt', 'updatedAt'],
     where: {
       storm_id: stormId,
     },
@@ -120,8 +122,7 @@ const getStormUsers = async (req, res) => {
   const users = stormId
     ? await user.findOne({
         attributes: ['business_name', 'email', 'mobile_number', 'storm_id'],
-        offset: 20 * page,
-        limit: 20,
+      
         where: {
           storm_id: stormId,
         },
@@ -132,7 +133,9 @@ const getStormUsers = async (req, res) => {
         limit: 20,
       });
 
-  res.status(200).send(users);
+    Array.isArray(users)
+      ? res.status(200).send(users)
+      : res.status(200).send([users]);
 };
 
 const getTransactions = async (req, res) => {
@@ -164,8 +167,7 @@ const getTransactions = async (req, res) => {
           'settlement_status',
           'transaction_status',
         ],
-        offset: 20 * page,
-        limit: 20,
+        
 
         where: {
 
@@ -192,14 +194,16 @@ const getTransactions = async (req, res) => {
           : undefined,
       }); 
 
-  res.send(transaction_list);
+      Array.isArray(transaction_list)
+        ? res.send(transaction_list)
+        : res.send([transaction_list]);
 };
 
 const superAdminLogin = async (req, res) => {
   const user_credentials = req.body;
 
   if (!user_credentials.email || !user_credentials.password) {
-    throw new BadRequestError('missing body fielda');
+    throw new BadRequestError('missing body field');
   }
 
   const super_admin = await superadmin.findOne({
@@ -392,6 +396,44 @@ const adminLogin = async (req, res) => {
   });
 };
 
+const createTerminalId=async (req,res)=>{
+
+  const { userId } = req.user;
+
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
+
+  const {terminalId, merchantId}= req.body
+
+  if (!terminalId || !merchantId){
+
+    throw new BadRequestError('missing fields')
+
+  }
+
+  const createdTerminalId=await terminal_id.create({
+    terminal_id: terminalId,
+
+    merchantId: merchantId
+
+
+  })
+
+  if(!createdTerminalId){
+
+    throw new Error("something went wrong")
+  }
+
+  res.status(200).send('terminal Id created')
+
+
+
+
+}
+
+
+
 module.exports = {
   addTerminalId,
   getTransactions,
@@ -400,4 +442,5 @@ module.exports = {
   adminLogin,
   transactionsTrackerRoute,
   getStormUsers,
+  createTerminalId
 };

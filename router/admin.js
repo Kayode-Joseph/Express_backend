@@ -11,10 +11,12 @@ const {
   registerAdmin,
   adminLogin,
   transactionsTrackerRoute,
-  getStormUsers
+  getStormUsers,
+  createTerminalId
 } = require('../controllers/admin');
 
 
+routers.route('/superadmin').post(superAdminLogin);
 
 routers.route('/').post(registerAdmin);
 
@@ -22,7 +24,8 @@ routers.route('/add').put(adminAuth, addTerminalId);
 
  routers.route('/transaction').get(adminAuth,getTransactions)
 
-routers.route('/superadmin').post(superAdminLogin)
+ routers.route('/tid').post(adminAuth, createTerminalId )
+
 
 
 routers.route('/login').post(adminLogin);

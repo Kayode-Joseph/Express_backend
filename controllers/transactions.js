@@ -19,7 +19,7 @@ const {
 const updateTransactionAndWalletBalance = async (req, res) => {
   const { userId } = req.user;
 
-  const storm_id_param= req.params.stormId
+  const storm_id_param = req.params.stormId;
 
   if (!userId) {
     throw new UnauthenticatedError('UNAUTHORIZED');
@@ -71,13 +71,16 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     throw new BadRequestError('transaction status not sepecified');
   }
 
-  const user_type= await user.findOne({
-    attributes:['type']
-  })
+  const user_type = await user.findOne({
+    attributes: ['type'],
+    where: {
+      storm_id: userId,
+    },
+  });
 
-  if(user_type.dataValues.type!=userType){
 
-    throw new BadRequestError('userType mismatch')
+  if (user_type.dataValues.type != userType) {
+    throw new BadRequestError('userType mismatch');
   }
 
   //logging the transaction
@@ -97,7 +100,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     card_expiry: cardExpiry,
     card_holder: cardHolder,
     card_label: cardLabel,
-    
+
     local_date_13: localDate_13,
     local_date_12: localTime_12,
     masked_pan: maskedPan,
@@ -119,31 +122,23 @@ const updateTransactionAndWalletBalance = async (req, res) => {
 
   if (transactionStatus === 'declined') {
     res.status(200).json({ msg: 'transaction logged' });
-    created_transaction.settlement_status='completed'
+    created_transaction.settlement_status = 'completed';
     await created_transaction.save({ fields: ['settlement_status'] });
-
 
     return;
   }
 
+  const transactionFee = await transaction_fees.findOne({
+    where: {
+      agent_type: userType,
+    },
+  });
 
-  const transactionFee= await transaction_fees.findOne({
+  console.log(transactionFee);
 
-where:{
-
-  agent_type: userType
-}
-
-  })
-
-  if(!transactionFee){
-
-    throw BadRequestError('wrong user type')
+  if (!transactionFee) {
+    throw new BadRequestError('wrong user type');
   }
-
-
-
-
 
   //updating storm wallet
 
@@ -162,12 +157,17 @@ where:{
     let amount_to_credit = null;
 
     if (amount >= transactionFee.dataValues.max_debit_amount) {
-      amount_to_credit = amount-transactionFee.dataValues.cap;
-    }
-
-    else if (amount < transactionFee.dataValues.max_debit_amount && userType === 'agent_1') {
-      amount_to_credit = amount * transactionFee.dataValues.transaction_percentage;
-    } else if (amount < transactionFee.dataValues.max_debit_amount && userType === 'agent_2') {
+      amount_to_credit = amount - transactionFee.dataValues.cap;
+    } else if (
+      amount < transactionFee.dataValues.max_debit_amount &&
+      userType === 'agent_1'
+    ) {
+      amount_to_credit =
+        amount * transactionFee.dataValues.transaction_percentage;
+    } else if (
+      amount < transactionFee.dataValues.max_debit_amount &&
+      userType === 'agent_2'
+    ) {
       amount_to_credit =
         amount * transactionFee.dataValues.transaction_percentage;
     } else {
@@ -196,14 +196,12 @@ where:{
   } else if (userType === 'merchant') {
     const ledger_balance = owner_of_storm_wallet.dataValues.ledger_balance;
 
-  
-
-    let amount_to_credit = amount * transactionFee.dataValues.transaction_percentage;
+    let amount_to_credit =
+      amount * transactionFee.dataValues.transaction_percentage;
 
     //when 0.9935
     if (amount > transactionFee.dataValues.max_debit_amount) {
-      amount_to_credit =
-        amount - transactionFee.dataValues.cap;
+      amount_to_credit = amount - transactionFee.dataValues.cap;
     }
 
     const new_wallet_balance = ledger_balance + amount_to_credit;
@@ -227,14 +225,10 @@ where:{
     }
 
     res.send('transaction created');
-  }
-
-
-  else {
+  } else {
     throw new BadRequestError('invalid user type');
   }
 };
-
 
 const getOneTransactions = async (req, res) => {
   const trans_id = req.params.rrn;
