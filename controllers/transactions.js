@@ -79,6 +79,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
   });
 
 
+  
   if (user_type.dataValues.type != userType) {
     throw new BadRequestError('userType mismatch');
   }
