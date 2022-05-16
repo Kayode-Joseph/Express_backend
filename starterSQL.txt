@@ -1,0 +1,19 @@
+INSERT INTO banks(bank_code, bank_name, createdAt, updatedAt) VALUES('033', 'united bank of africa',now(),now()),
+('035', 'wema bank', now(),now()), ('044', 'access bank',now(), now()),('050', 'eco bank',now(), now()),
+('011', 'first bank',now(), now()), ('057', 'zenith bank',now(), now()), ('058', 'guaranty trust bank',now(), now()),
+('076', 'polaris bank',now(), now()),('039', 'stanbic ibtc bank',now(), now()),('214', 'first city monument bank',now(), now())
+,('215', 'unity bank plc',now(), now()),(232, 'sterling bank',now(), now()), ('070', 'fedelity bank',now(), now()),
+('032', 'union bank',now(), now()), ('082', 'keystone bank',now(), now()), ('063', 'access diamond bank',now(), now()),
+('101', 'providus bank',now(), now()),('068', 'standard chartered bank',now(), now()), ('700', 'pocket moni mobile wallet',now(), now()),
+('755', 'ab microfinance bank',now(), now()), ('023', 'city bank nigeria limited',now(), now()), ('103', 'globus bank',now(), now()),
+('502', 'rand merchant bank',now(), now()), ('100', 'suntrust bank nigeria limited',now(), now()),
+('302', 'taj bank limited',now(), now()), ('102', 'titan trust bank limited',now(), now())
+
+
+
+INSERT INTO `transaction_fees` (`agent_type`, `transaction_percentage`, `cap`, `transfer_out_fee`, `max_debit_amount`, `createdAt`, `updatedAt`)
+VALUES ('agent_2', '0.9935', '120', '20', '20000', now(), now()), ('agent_1', '0.9945', '120', '20', '20000', now(), now()), ('merchant', '0.9935', '1000', '20', '153846.154', now(),now());
+
+
+INSERT INTO `superadmins` (`email`, `password`, `createdAt`, `updatedAt`)
+VALUES ('doyinmama@gmail.com', '', now(), now());

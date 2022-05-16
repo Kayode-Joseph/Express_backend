@@ -12,7 +12,7 @@ const {
   storm_wallet,
   superadmin,
   admin,
-  terminal_id
+  terminal_id,
 } = require('../DB/models');
 
 const bcrypt = require('bcrypt');
@@ -29,7 +29,7 @@ const transactions_tracker = async () => {
 
   const date_in_millis = new Date().getTime();
 
-  console.log(date_in_millis);
+ // console.log(date_in_millis);
 
   const dateToGetUpper = new Date(date_in_millis);
 
@@ -79,10 +79,34 @@ const addTerminalId = async (req, res) => {
     throw new UnauthenticatedError('UNAUTHORIZED');
   }
 
-  const { stormId, terminalId } = req.body;
+  const { stormId, terminalId, isTransferEnabled } = req.body;
+
+  if (!stormId) {
+    throw new BadRequestError('missing stormId field');
+  }
+
+  if (!terminalId && !isTransferEnabled) {
+    throw new BadRequestError('missing Fields');
+  }
+
+  if (isTransferEnabled) {
+    if (isTransferEnabled != 'true' && isTransferEnabled != 'false') {
+      throw new BadRequestError('invalid input for field isTransferEnabled');
+    }
+  }
 
   const user_to_update = await user.findOne({
-     attributes:['storm_id', 'email','password', 'business_name', 'mobile_number', 'account_number', 'type','createdAt', 'updatedAt'],
+    attributes: [
+      'storm_id',
+      'email',
+      'password',
+      'business_name',
+      'mobile_number',
+      'account_number',
+      'type',
+      'createdAt',
+      'updatedAt',
+    ],
     where: {
       storm_id: stormId,
     },
@@ -92,13 +116,32 @@ const addTerminalId = async (req, res) => {
     throw new NotFoundError('cannot find user');
   }
 
-  user_to_update.terminal_id = terminalId;
+  if (terminalId) {
+    user_to_update.terminal_id = terminalId;
+    await user_to_update.save({ fields: ['terminal_id'] });
+  }
+  if (isTransferEnabled) {
+    user_to_update.is_transfer_enabled = isTransferEnabled;
+    await user_to_update.save({ fields: ['is_transfer_enabled'] });
+  }
 
-  user_to_update.is_terminal_id = 'true';
+  if (terminalId && isTransferEnabled === 'true') {
+    res.send('terminal Id and transfer enabled');
+    return;
+  }
 
-  await user_to_update.save({ fields: ['terminal_id', 'is_terminal_id'] });
+  if (terminalId && isTransferEnabled === 'false') {
+    res.send('terminal id and transfer disabled');
+    return
+  }
 
-  res.send('terminal id updated');
+  terminalId
+    ? res.send('terminal id updated')
+    : isTransferEnabled === 'true'
+    ? res.send('transfer enabled')
+    : isTransferEnabled === 'false'
+    ? res.send('transfer disabled')
+    : res.status(400).send('bad request');
 };
 
 const getStormUsers = async (req, res) => {
@@ -121,21 +164,23 @@ const getStormUsers = async (req, res) => {
 
   const users = stormId
     ? await user.findOne({
-        attributes: ['business_name', 'email', 'mobile_number', 'storm_id'],
-      
+        attributes: ['business_name', 'email', 'mobile_number', 'storm_id', 'terminal_id', 'is_transfer_enabled'],
+
         where: {
           storm_id: stormId,
         },
       })
     : await user.findAll({
-        attributes: ['business_name', 'email', 'mobile_number', 'storm_id'],
+        attributes: ['business_name', 'email', 'mobile_number', 'storm_id' ,'terminal_id', 'is_transfer_enabled'],
         offset: 20 * page,
         limit: 20,
       });
 
-    Array.isArray(users)
-      ? res.status(200).send(users)
-      : res.status(200).send([users]);
+  Array.isArray(users)
+    ? res.status(200).json({ page: page, count: users.length, result: users })
+    : res
+        .status(200)
+        .json({ page: page, count: users ? 1 : 0, result: [users] });
 };
 
 const getTransactions = async (req, res) => {
@@ -146,9 +191,11 @@ const getTransactions = async (req, res) => {
 
   const page = req.query.page;
 
-  const stormId= req.query.stormId
+  const stormId = req.query.stormId;
 
-  const rrn= req.query.rrn
+  const rrn = req.query.rrn;
+
+  const tid = req.query.tid;
 
   if (!page) {
     throw new BadRequestError('query param page is missing');
@@ -161,22 +208,23 @@ const getTransactions = async (req, res) => {
     ? await transactions.findOne({
         attributes: [
           'storm_id',
+          'terminal_id',
           'rrn',
           'amount',
           'createdAt',
           'settlement_status',
           'transaction_status',
         ],
-        
 
         where: {
-
-          rrn: rrn
-        }
+          rrn: rrn,
+        },
       })
-    : await transactions.findAll({
+    : stormId
+    ? await transactions.findAll({
         attributes: [
           'storm_id',
+          'terminal_id',
           'rrn',
           'amount',
           'createdAt',
@@ -187,16 +235,41 @@ const getTransactions = async (req, res) => {
         offset: 20 * page,
         limit: 20,
 
-        where: stormId
+        where: {
+          storm_id: stormId,
+        },
+      })
+    : await transactions.findAll({
+        attributes: [
+          'storm_id',
+          'terminal_id',
+          'rrn',
+          'amount',
+          'createdAt',
+          'settlement_status',
+          'transaction_status',
+        ],
+
+        offset: 20 * page,
+        limit: 20,
+
+        where: tid
           ? {
-              storm_id: stormId,
+              terminal_id: tid,
             }
           : undefined,
-      }); 
+      });
 
-      Array.isArray(transaction_list)
-        ? res.send(transaction_list)
-        : res.send([transaction_list]);
+  Array.isArray(transaction_list)
+    ? res.json({
+        page: page,
+        length: transaction_list.length,
+        result: transaction_list,
+      })
+    : res.json({
+        page: page,
+        length: transaction_list ? 1 : (0)[transaction_list],
+      });
 };
 
 const superAdminLogin = async (req, res) => {
@@ -396,43 +469,31 @@ const adminLogin = async (req, res) => {
   });
 };
 
-const createTerminalId=async (req,res)=>{
-
+const createTerminalId = async (req, res) => {
   const { userId } = req.user;
 
   if (!userId) {
     throw new UnauthenticatedError('UNAUTHORIZED');
   }
 
-  const {terminalId, merchantId}= req.body
+  const { terminalId, merchantId } = req.body;
 
-  if (!terminalId || !merchantId){
-
-    throw new BadRequestError('missing fields')
-
+  if (!terminalId || !merchantId) {
+    throw new BadRequestError('missing fields');
   }
 
-  const createdTerminalId=await terminal_id.create({
+  const createdTerminalId = await terminal_id.create({
     terminal_id: terminalId,
 
-    merchantId: merchantId
+    merchantId: merchantId,
+  });
 
-
-  })
-
-  if(!createdTerminalId){
-
-    throw new Error("something went wrong")
+  if (!createdTerminalId) {
+    throw new Error('something went wrong');
   }
 
-  res.status(200).send('terminal Id created')
-
-
-
-
-}
-
-
+  res.status(200).send('terminal Id created');
+};
 
 module.exports = {
   addTerminalId,
@@ -442,5 +503,5 @@ module.exports = {
   adminLogin,
   transactionsTrackerRoute,
   getStormUsers,
-  createTerminalId
+  createTerminalId,
 };

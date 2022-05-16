@@ -4,11 +4,17 @@ const {
   BadRequestError,
 } = require('../errors');
 
+const axios = require('axios').default;
+
 const {
   storm_wallet,
   debit_wallet_transactions,
   transaction_fees,
+  user,
+  banks,
 } = require('../DB/models');
+
+require('dotenv').config();
 
 const getBalance = async (req, res) => {
   const { userId } = req.user;
@@ -52,34 +58,74 @@ const createWallet = async (req, res) => {
   // res.send('wallet created')
 };
 
-const debitWallet = async (req, res) => {
-
- 
+const debitWallet = async (req, res, next) => {
   const { userId } = req.user;
 
-  const { stormId: stormIdParams} = req.params;
+  const { stormId: stormIdParams } = req.params;
 
   const {
-    bankCode,
-    amount,
-    reference,
-    description,
-    destination,
+    accountNumber,
+
     senderName,
-    endPoint,
-    terminalId,
+
+    recieverName,
+
+    bankCode,
+
     stormId,
-    status,
-    userType,
+
+    amount,
   } = req.body;
 
-  if (!stormId || !status || !amount || !terminalId || !userType) {
+  if (
+    !stormId ||
+    !accountNumber ||
+    !recieverName ||
+    !senderName ||
+    !amount ||
+    !bankCode
+  ) {
     throw new BadRequestError('missing field');
   }
 
-  if (userId != stormId|| userId!= stormIdParams) {
+  if (isNaN(amount)) {
+    throw new BadRequestError('invalid datatype for amount');
+  }
+
+  if (userId != stormId || userId != stormIdParams) {
     throw new UnauthenticatedError('unauthorized');
   }
+
+  const bank = await banks.findOne({
+    attributes: ['bank_code'],
+
+    where: {
+      bank_code: bankCode,
+    },
+  });
+
+  if (!bank) {
+    throw new BadRequestError('invalid bank code');
+  }
+
+  const user_from_database = await user.findOne({
+    attributes: ['type', 'terminal_id', 'is_transfer_enabled'],
+
+    where: {
+      storm_id: stormId,
+    },
+  });
+
+  if (!user_from_database) {
+    throw new Error('something went wrong');
+  }
+
+  if(user_from_database.dataValues.is_transfer_enabled==='false'){
+
+    res.status(200).json({code:501, message:'transfer disabled'})
+  }
+
+  const userType = user_from_database.dataValues.type;
 
   const transactionFee = await transaction_fees.findOne({
     attributes: ['transfer_out_fee'],
@@ -93,30 +139,6 @@ const debitWallet = async (req, res) => {
     throw new BadRequestError('invalid user type');
   }
 
-  const debitTransaction = await debit_wallet_transactions.create({
-    bank_code: bankCode,
-    amount: -amount,
-    reference: reference,
-    description: description,
-    destination: destination,
-    senderName: senderName,
-    endPoint: endPoint,
-    terminal_id: terminalId,
-    storm_id: stormId,
-    status: status,
-    user_type: userType,
-  });
-
-  if (!debitTransaction) {
-    throw new Error('something went wrong');
-  }
-
-  if (status == 'declined') {
-    res.status(200).send('transaction logged');
-
-    return;
-  }
-
   const stormWallet = await storm_wallet.findOne({
     where: {
       storm_id: stormId,
@@ -127,25 +149,212 @@ const debitWallet = async (req, res) => {
     throw new Error('something went wrong');
   }
 
-  stormWallet.ledger_balance =
-    stormWallet.dataValues.ledger_balance -
-    amount -
-    transactionFee.dataValues.transfer_out_fee;
-
-  stormWallet.wallet_balance =
+  const check_if_available_balance_is_sufficient_for_transaction = Math.sign(
     stormWallet.dataValues.wallet_balance -
-    amount -
-    transactionFee.dataValues.transfer_out_fee;
+      amount -
+      transactionFee.dataValues.transfer_out_fee
+  );
 
-  await stormWallet.save({
-    fields: ['ledger_balance', 'wallet_balance'],
+  if(check_if_available_balance_is_sufficient_for_transaction!=0&&check_if_available_balance_is_sufficient_for_transaction!=1&&check_if_available_balance_is_sufficient_for_transaction!=-1){
+
+    throw new BadRequestError('something went wrong')
+  }
+
+
+
+  if(check_if_available_balance_is_sufficient_for_transaction===-1){
+
+    res.json({code:502, message: 'insufficient balance'})
+    return
+  }
+
+  const referenceRandom = `FTSTORM${Math.floor(
+    Math.random() * 1000000000000000
+  )}`;
+
+  const description = `from ${senderName.substring(
+    0,
+    8
+  )} to ${recieverName.substring(0, 8)} via NetPos`;
+
+  const debitTransaction = await debit_wallet_transactions.create({
+    bank_code: bankCode,
+    amount: -amount,
+    reference: referenceRandom,
+    description: description,
+    destination: accountNumber,
+    senderName: senderName,
+    endPoint: 'A',
+    terminal_id: user_from_database.dataValues.terminal_id,
+    storm_id: stormId,
+    status: 'declined',
+    user_type: userType,
+    transaction_fee: -transactionFee.dataValues.transfer_out_fee,
   });
 
-  res.status(200).json({
-    ledger_balance: stormWallet.dataValues.ledger_balance,
+  let eTranzactResponse=null
+  try{
+  eTranzactResponse = await axios.post(
+    'https://www.etranzact.net/rest/switchIT/api/v1/fund-transfer',
+    {
+      action: 'FT',
+      terminalId: process.env.TID,
+      transaction: {
+        pin: process.env.AES,
+        bankCode: bankCode,
+        senderName: `${senderName.substring(0, 8)}||${recieverName.substring(
+          0,
+          8
+        )}|${accountNumber} `,
+        amount: amount,
+        description: description,
+        destination: accountNumber,
+        reference: referenceRandom,
+        endPoint: 'A',
+      },
+    },
+    { timeout: 32000 }
+  );
+  }
+  catch(error){
 
-    wallet_balance: stormWallet.dataValues.wallet_balance,
+debitTransaction.response_code = 500;
+
+debitTransaction.response_message = error.message;
+
+await debitTransaction.save({
+  fields: [
+    
+    'response_code',
+    'response_message',
+   
+  ],
+});
+
+
+next(error)
+
+return
+
+
+  }
+  //res.send(eTranzactResponse.data);
+
+  if (!eTranzactResponse) {
+    throw new Error('something went wrong');
+  }
+
+  if (eTranzactResponse.data.error === '0') {
+    
+
+    stormWallet.ledger_balance =
+      stormWallet.dataValues.ledger_balance -
+      amount -
+      transactionFee.dataValues.transfer_out_fee;
+
+    stormWallet.wallet_balance =
+      stormWallet.dataValues.wallet_balance -
+      amount -
+      transactionFee.dataValues.transfer_out_fee;
+
+    await stormWallet.save({
+      fields: ['ledger_balance', 'wallet_balance'],
+    });
+
+
+    debitTransaction.reference_from_etranzact = eTranzactResponse.data.reference;
+
+    debitTransaction.response_code = eTranzactResponse.data.error;
+
+    debitTransaction.response_message = eTranzactResponse.data.message;
+
+    debitTransaction.status = 'approved';
+
+    await debitTransaction.save({
+      fields: [
+        'reference_from_etranzact',
+        'response_code',
+        'response_message',
+        'status',
+      ],
+    });
+
+     res.status(200).json({
+       ledger_balance: stormWallet.dataValues.ledger_balance,
+
+       wallet_balance: stormWallet.dataValues.wallet_balance,
+     });
+
+    return;
+  }
+
+  debitTransaction.reference_from_etranzact = eTranzactResponse.data.reference;
+
+  debitTransaction.response_code = eTranzactResponse.data.error;
+
+  debitTransaction.response_message = eTranzactResponse.data.message;
+
+  await debitTransaction.save({
+    fields: [
+      'reference_from_etranzact',
+      'response_code',
+      'response_message',
+      'status',
+    ],
   });
+
+
+  res.json({ code: eTranzactResponse.data.error, message: eTranzactResponse.data.message });
+
+ 
 };
 
-module.exports = { getBalance, createWallet, debitWallet };
+const verifyName = async (req, res, next) => {
+  const { userId } = req.user;
+
+  const { stormId, bankCode, accountNumber } = req.body;
+
+  if (!stormId || !bankCode || !accountNumber) {
+    throw new BadRequestError('missing field');
+  }
+
+  if (stormId != userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
+
+  const referenceRandom = Math.floor(Math.random() * 1000000000000000);
+
+  const eTranzactResponse = await axios.post(
+    'https://www.etranzact.net/rest/switchIT/api/v1/account-query',
+    {
+      action: 'AQ',
+      terminalId: process.env.TID,
+      transaction: {
+        pin: process.env.AES,
+        bankCode: bankCode,
+        amount: '0.0',
+        description: 'Account Query',
+        destination: accountNumber,
+        reference: `AQSTORM${referenceRandom}`,
+        endPoint: 'A',
+      },
+    },
+    { timeout: 15000 }
+  );
+
+  if (eTranzactResponse.data.error == 0) {
+    res.status(200).json({ code: 0, message: eTranzactResponse.data.message });
+    return;
+  } else if (eTranzactResponse.data.error == 24) {
+    res.status(200).json({ code: 24, message: eTranzactResponse.data.message });
+
+    return;
+  }
+
+  console.log(eTranzactResponse.data);
+  res.status(200).json({
+    code: eTranzactResponse.data.error,
+    message: eTranzactResponse.data.message,
+  });
+};
+module.exports = { getBalance, createWallet, debitWallet, verifyName };

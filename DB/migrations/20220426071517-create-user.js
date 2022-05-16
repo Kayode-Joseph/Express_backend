@@ -63,7 +63,7 @@ module.exports = {
           onDelete: 'CASCADE',
         },
       },
-      is_terminal_id: {
+      is_transfer_enabled: {
         type: DataTypes.ENUM('true', 'false'),
         allowNull: false,
         defaultValue: 'false',

@@ -37,6 +37,8 @@ const userRouter = require('./router/user');
 
 const adminRouter = require('./router/admin');
 
+const bankRouter = require('./router/banks');
+
 const notFoundMiddleware = require('./middleware/not-found');
 const errorHandlerMiddleware = require('./middleware/error-handler');
 
@@ -77,6 +79,8 @@ app.use(xss_clean());
 app.get('/', (req, res) => {
   res.send('testing testing');
 });
+
+app.use('/api/v1/banks', bankRouter)
 
 
 

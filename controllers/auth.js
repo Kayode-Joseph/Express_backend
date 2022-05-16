@@ -14,7 +14,7 @@ const login = async (req, res) => {
 
   const user_that_want_to_login = await user.findOne({
     
-    attributes:['storm_id', 'email','password', 'business_name', 'mobile_number', 'account_number', 'createdAt', 'updatedAt'],
+    attributes:['storm_id', 'email','password', 'business_name', 'mobile_number', 'account_number', 'terminal_id','type','createdAt', 'updatedAt'],
     
     where: {
       email: email,

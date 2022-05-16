@@ -23,6 +23,9 @@ module.exports = {
         allowNull: false,
         unique: true,
       },
+      reference_from_etranzact: {
+        type: DataTypes.STRING,
+      },
       description: {
         type: DataTypes.TEXT,
       },
@@ -37,7 +40,7 @@ module.exports = {
       },
       terminal_id: {
         type: DataTypes.STRING,
-        allowNull: false,
+      
       },
       storm_id: {
         type: DataTypes.STRING,
@@ -54,6 +57,17 @@ module.exports = {
       },
       amount: {
         type: DataTypes.DOUBLE,
+      },
+      response_code: {
+        type: DataTypes.STRING,
+      },
+      response_message: {
+        type: DataTypes.STRING,
+      },
+       transaction_fee: {
+        type: DataTypes.DOUBLE,
+        allowNull: false,
+      
       },
       createdAt: {
         allowNull: false,

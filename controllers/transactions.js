@@ -12,9 +12,99 @@ const {
   storm_wallet,
   merchant_transaction_cache,
   transaction_fees,
+  debit_wallet_transactions,
 } = require('../DB/models');
 
-//admin operation get all database transactions
+//not a route, function to get debit wallet transactions
+const debit_transaction_getter = async (
+  stormId,
+  page,
+  terminalId,
+  reference
+) => {
+  const transactionList = reference
+    ? await debit_wallet_transactions.findOne({
+        attributes: [
+          'reference',
+          'amount',
+          'transaction_fee',
+          'description',
+          'destination',
+          'storm_id',
+          'terminal_id',
+          'reference_from_etranzact',
+        ],
+
+        where: {
+          reference: reference,
+        },
+      })
+    : stormId
+    ? await debit_wallet_transactions.findAll({
+        attributes: [
+          'reference',
+          'amount',
+          'transaction_fee',
+          'description',
+          'destination',
+          'storm_id',
+          'terminal_id',
+          'reference_from_etranzact',
+        ],
+
+        where: {
+          storm_id: stormId,
+        },
+
+        offset: page * 20,
+
+        limit: 20,
+      })
+    : terminalId
+    ? await debit_wallet_transactions.findAll({
+        attributes: [
+          'reference',
+          'amount',
+          'transaction_fee',
+          'description',
+          'destination',
+          'storm_id',
+          'terminal_id',
+          'reference_from_etranzact',
+        ],
+
+        where: {
+          terminal_id: terminalId,
+        },
+
+        offset: page * 20,
+
+        limit: 20,
+      })
+    : await debit_wallet_transactions.findAll({
+        attributes: [
+          'reference',
+          'amount',
+          'trasaction_fee',
+          'description',
+          'destination',
+          'storm_id',
+          'terminal_id',
+          'reference_from_etranzact',
+        ],
+        offset: page * 20,
+
+        limit: 20,
+      });
+
+  const transactionListArray = Array.isArray(transactionList)
+    ? transactionList
+    : [transactionList];
+
+ 
+
+  return transactionListArray;
+};
 
 const updateTransactionAndWalletBalance = async (req, res) => {
   const { userId } = req.user;
@@ -78,8 +168,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     },
   });
 
-
- if (user_type.dataValues.type != userType) {
+  if (user_type.dataValues.type != userType) {
     throw new BadRequestError('userType mismatch');
   }
 
@@ -307,8 +396,50 @@ const getTransactionByDate = async (req, res) => {
   console.log('get transaction by date');
 };
 
+const getDebitTransactions = async (req, res) => {
+  const { userId } = req.user;
+
+  const stormId = req.query.stormId;
+
+  if (userId != stormId) {
+    throw new UnauthenticatedError('Unathenticated');
+  }
+
+  const page = req.query.page;
+
+  const reference = req.query.reference;
+
+  const terminalId = req.query.terminalId;
+
+  if (isNaN(page)) {
+    throw new BadRequestError('page must be a number');
+  }
+
+  if (!reference && !page) {
+    throw new BadRequestError('missing key query param');
+  }
+
+  const transaction_list = await debit_transaction_getter(
+    stormId,
+    page,
+    terminalId,
+    reference
+  );
+
+  if (!transaction_list) {
+    throw new Error('Something went wrong');
+  }
+
+  if (transaction_list[0] == null) {
+    res.send([]);
+  }
+
+  res.send(transaction_list);
+};
+
 module.exports = {
   getOneTransactions,
+  getDebitTransactions,
 
   updateTransactionAndWalletBalance,
   getTransactionByDate,

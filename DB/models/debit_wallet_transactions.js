@@ -29,6 +29,9 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
       },
+      reference_from_etranzact: {
+        type: DataTypes.STRING,
+      },
       description: {
         type: DataTypes.TEXT,
       },
@@ -43,7 +46,6 @@ module.exports = (sequelize, DataTypes) => {
       },
       terminal_id: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
       storm_id: {
         type: DataTypes.STRING,
@@ -57,6 +59,17 @@ module.exports = (sequelize, DataTypes) => {
       user_type: {
         type: DataTypes.STRING,
         allowNull: false,
+      },
+      response_code: {
+        type: DataTypes.STRING,
+      },
+      response_message: {
+        type: DataTypes.STRING,
+      },
+      transaction_fee: {
+        type: DataTypes.DOUBLE,
+        allowNull: false,
+        validator: { notNull: true, isDecimal: true },
       },
     },
     {
