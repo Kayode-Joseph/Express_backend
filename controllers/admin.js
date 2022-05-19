@@ -6,6 +6,8 @@ const {
 
 const { Op } = require('sequelize');
 
+const {   debit_transaction_getter }= require('./transactions')
+
 const {
   user,
   transactions,
@@ -495,6 +497,54 @@ const createTerminalId = async (req, res) => {
   res.status(200).send('terminal Id created');
 };
 
+
+const getDebitTransactions= async (req,res)=>{
+
+const { userId } = req.user;
+
+if (!userId) {
+  throw new UnauthenticatedError('UNAUTHORIZED');
+}
+
+ const stormId = req.query.stormId;
+
+ const page = req.query.page;
+
+ const reference = req.query.reference;
+
+ const terminalId = req.query.terminalId;
+
+ if (isNaN(page)) {
+   throw new BadRequestError('page must be a number');
+ }
+
+ if (!reference && !page) {
+   throw new BadRequestError('missing key query param');
+ }
+
+ const transaction_list = await debit_transaction_getter(
+   stormId,
+   page,
+   terminalId,
+   reference
+ );
+
+ if (!transaction_list) {
+   throw new Error('Something went wrong');
+ }
+
+ if (transaction_list[0] == null) {
+   res.send([]);
+ }
+
+ res.send(transaction_list);
+
+
+
+
+
+}
+
 module.exports = {
   addTerminalId,
   getTransactions,
@@ -504,4 +554,5 @@ module.exports = {
   transactionsTrackerRoute,
   getStormUsers,
   createTerminalId,
+  getDebitTransactions
 };

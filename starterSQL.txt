@@ -16,4 +16,4 @@ VALUES ('agent_2', '0.9935', '120', '20', '20000', now(), now()), ('agent_1', '0
 
 
 INSERT INTO `superadmins` (`email`, `password`, `createdAt`, `updatedAt`)
-VALUES ('doyinmama@gmail.com', '', now(), now());
+VALUES ('doyinmama@gmail.com', '$2b$10$PwUEdmmpf2c/alqg1tPw.u88ovuGDXlgRZitpggLGRi.MOvZrE/G2', now(), now());

@@ -33,6 +33,12 @@ const debit_transaction_getter = async (
           'storm_id',
           'terminal_id',
           'reference_from_etranzact',
+          'status',
+          'terminal_id',
+          'reference_from_etranzact',
+          'response_code',
+          'response_message',
+          'updatedAt',
         ],
 
         where: {
@@ -50,6 +56,12 @@ const debit_transaction_getter = async (
           'storm_id',
           'terminal_id',
           'reference_from_etranzact',
+          'status',
+          'terminal_id',
+          'reference_from_etranzact',
+          'response_code',
+          'response_message',
+          'updatedAt',
         ],
 
         where: {
@@ -71,6 +83,12 @@ const debit_transaction_getter = async (
           'storm_id',
           'terminal_id',
           'reference_from_etranzact',
+          'status',
+          'terminal_id',
+          'reference_from_etranzact',
+          'response_code',
+          'response_message',
+          'updatedAt',
         ],
 
         where: {
@@ -85,12 +103,18 @@ const debit_transaction_getter = async (
         attributes: [
           'reference',
           'amount',
-          'trasaction_fee',
+          'transaction_fee',
           'description',
           'destination',
           'storm_id',
           'terminal_id',
           'reference_from_etranzact',
+          'status',
+          'terminal_id',
+          'reference_from_etranzact',
+          'response_code',
+          'response_message',
+          'updatedAt',
         ],
         offset: page * 20,
 
@@ -100,8 +124,6 @@ const debit_transaction_getter = async (
   const transactionListArray = Array.isArray(transactionList)
     ? transactionList
     : [transactionList];
-
- 
 
   return transactionListArray;
 };
@@ -223,7 +245,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     },
   });
 
-  console.log(transactionFee);
+
 
   if (!transactionFee) {
     throw new BadRequestError('wrong user type');
@@ -443,4 +465,5 @@ module.exports = {
 
   updateTransactionAndWalletBalance,
   getTransactionByDate,
+  debit_transaction_getter
 };

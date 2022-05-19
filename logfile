@@ -3353,3 +3353,14 @@
 200 /api/v1/auth/login POST 15/May/2022:19:39:57 +0000 695 thread:6233
 201 /api/v1/admin/login POST 16/May/2022:07:51:49 +0000 417 thread:9620
 200 /api/v1/admin/users?page=0 GET 16/May/2022:07:52:22 +0000 231 thread:9621
+401 /api/v1/wallet/getname POST 16/May/2022:08:36:00 +0000 22 thread:10199
+401 /api/v1/wallet/getname POST 16/May/2022:08:36:12 +0000 32 thread:10201
+400 /api/v1/wallet/getname POST 16/May/2022:08:36:38 +0000 23 thread:10204
+400 /api/v1/wallet/getname POST 16/May/2022:08:37:37 +0000 23 thread:10203
+200 /api/v1/wallet/getname POST 16/May/2022:08:38:37 +0000 46 thread:10199
+401 /api/v1/admin/tid POST 16/May/2022:09:43:40 +0000 32 thread:10201
+401 /api/v1/admin/tid POST 16/May/2022:09:44:40 +0000 32 thread:10204
+201 /api/v1/admin/login POST 19/May/2022:19:58:11 +0000 414 thread:85200
+200 /api/v1/admin/transaction?page=0 GET 19/May/2022:20:00:19 +0000 250 thread:85202
+500 /api/v1/admin/debit?page=0 GET 19/May/2022:20:00:33 +0000 59 thread:85201
+200 /api/v1/admin/debit?page=0 GET 19/May/2022:20:02:27 +0000 1160 thread:85312

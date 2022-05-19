@@ -120,9 +120,8 @@ const debitWallet = async (req, res, next) => {
     throw new Error('something went wrong');
   }
 
-  if(user_from_database.dataValues.is_transfer_enabled==='false'){
-
-    res.status(200).json({code:501, message:'transfer disabled'})
+  if (user_from_database.dataValues.is_transfer_enabled === 'false') {
+    res.status(200).json({ code: 501, message: 'transfer disabled' });
   }
 
   const userType = user_from_database.dataValues.type;
@@ -155,17 +154,17 @@ const debitWallet = async (req, res, next) => {
       transactionFee.dataValues.transfer_out_fee
   );
 
-  if(check_if_available_balance_is_sufficient_for_transaction!=0&&check_if_available_balance_is_sufficient_for_transaction!=1&&check_if_available_balance_is_sufficient_for_transaction!=-1){
-
-    throw new BadRequestError('something went wrong')
+  if (
+    check_if_available_balance_is_sufficient_for_transaction != 0 &&
+    check_if_available_balance_is_sufficient_for_transaction != 1 &&
+    check_if_available_balance_is_sufficient_for_transaction != -1
+  ) {
+    throw new BadRequestError('something went wrong');
   }
 
-
-
-  if(check_if_available_balance_is_sufficient_for_transaction===-1){
-
-    res.json({code:502, message: 'insufficient balance'})
-    return
+  if (check_if_available_balance_is_sufficient_for_transaction === -1) {
+    res.json({ code: 502, message: 'insufficient balance' });
+    return;
   }
 
   const referenceRandom = `FTSTORM${Math.floor(
@@ -192,51 +191,41 @@ const debitWallet = async (req, res, next) => {
     transaction_fee: -transactionFee.dataValues.transfer_out_fee,
   });
 
-  let eTranzactResponse=null
-  try{
-  eTranzactResponse = await axios.post(
-    'https://www.etranzact.net/rest/switchIT/api/v1/fund-transfer',
-    {
-      action: 'FT',
-      terminalId: process.env.TID,
-      transaction: {
-        pin: process.env.AES,
-        bankCode: bankCode,
-        senderName: `${senderName.substring(0, 8)}||${recieverName.substring(
-          0,
-          8
-        )}|${accountNumber} `,
-        amount: amount,
-        description: description,
-        destination: accountNumber,
-        reference: referenceRandom,
-        endPoint: 'A',
+  let eTranzactResponse = null;
+  try {
+    eTranzactResponse = await axios.post(
+      'https://www.etranzact.net/rest/switchIT/api/v1/fund-transfer',
+      {
+        action: 'FT',
+        terminalId: process.env.TID,
+        transaction: {
+          pin: process.env.AES,
+          bankCode: bankCode,
+          senderName: `${senderName.substring(0, 8)}||${recieverName.substring(
+            0,
+            8
+          )}|${accountNumber} `,
+          amount: amount,
+          description: description,
+          destination: accountNumber,
+          reference: referenceRandom,
+          endPoint: 'A',
+        },
       },
-    },
-    { timeout: 32000 }
-  );
-  }
-  catch(error){
+      { timeout: 32000 }
+    );
+  } catch (error) {
+    debitTransaction.response_code = 500;
 
-debitTransaction.response_code = 500;
+    debitTransaction.response_message = error.message;
 
-debitTransaction.response_message = error.message;
+    await debitTransaction.save({
+      fields: ['response_code', 'response_message'],
+    });
 
-await debitTransaction.save({
-  fields: [
-    
-    'response_code',
-    'response_message',
-   
-  ],
-});
+    next(error);
 
-
-next(error)
-
-return
-
-
+    return;
   }
   //res.send(eTranzactResponse.data);
 
@@ -245,8 +234,6 @@ return
   }
 
   if (eTranzactResponse.data.error === '0') {
-    
-
     stormWallet.ledger_balance =
       stormWallet.dataValues.ledger_balance -
       amount -
@@ -261,8 +248,8 @@ return
       fields: ['ledger_balance', 'wallet_balance'],
     });
 
-
-    debitTransaction.reference_from_etranzact = eTranzactResponse.data.reference;
+    debitTransaction.reference_from_etranzact =
+      eTranzactResponse.data.reference;
 
     debitTransaction.response_code = eTranzactResponse.data.error;
 
@@ -279,11 +266,17 @@ return
       ],
     });
 
-     res.status(200).json({
-       ledger_balance: stormWallet.dataValues.ledger_balance,
+    res.status(200).json({
+      code: '0',
 
-       wallet_balance: stormWallet.dataValues.wallet_balance,
-     });
+      message: 'Account Credited Successfully',
+
+      data: {
+        ledger_balance: stormWallet.dataValues.ledger_balance,
+
+        wallet_balance: stormWallet.dataValues.wallet_balance,
+      },
+    });
 
     return;
   }
@@ -303,10 +296,10 @@ return
     ],
   });
 
-
-  res.json({ code: eTranzactResponse.data.error, message: eTranzactResponse.data.message });
-
- 
+  res.json({
+    code: eTranzactResponse.data.error,
+    message: eTranzactResponse.data.message,
+  });
 };
 
 const verifyName = async (req, res, next) => {
@@ -342,8 +335,13 @@ const verifyName = async (req, res, next) => {
     { timeout: 15000 }
   );
 
-  if (eTranzactResponse.data.error == 0) {
-    res.status(200).json({ code: 0, message: eTranzactResponse.data.message });
+  if (eTranzactResponse.data.error === '0') {
+    res
+      .status(200)
+      .json({
+        code: eTranzactResponse.data.error,
+        message: eTranzactResponse.data.message,
+      });
     return;
   } else if (eTranzactResponse.data.error == 24) {
     res.status(200).json({ code: 24, message: eTranzactResponse.data.message });
