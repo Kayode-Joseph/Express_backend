@@ -1,5 +1,9 @@
 const { Op } = require('sequelize');
 
+const axios = require('axios').default;
+
+
+
 const {
   NotFoundError,
   UnauthenticatedError,
@@ -71,6 +75,8 @@ const debit_transaction_getter = async (
         offset: page * 20,
 
         limit: 20,
+
+        order: [['updatedAt', 'DESC']],
       })
     : terminalId
     ? await debit_wallet_transactions.findAll({
@@ -94,6 +100,8 @@ const debit_transaction_getter = async (
         where: {
           terminal_id: terminalId,
         },
+
+        order: [['updatedAt', 'DESC']],
 
         offset: page * 20,
 
@@ -119,6 +127,8 @@ const debit_transaction_getter = async (
         offset: page * 20,
 
         limit: 20,
+
+        order: [['updatedAt', 'DESC']],
       });
 
   const transactionListArray = Array.isArray(transactionList)
@@ -183,6 +193,29 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     throw new BadRequestError('transaction status not sepecified');
   }
 
+  try {
+    const netposWebHook = await axios.post(
+      process.env.WEBHOOKURL,
+      {
+        transactionResponse: {
+          ...req.body,
+          rrn: RRN,
+          responseMessage: transactionStatus,
+        },
+      },
+      {
+        timeout: 30000,
+        headers: {
+          'content-type': 'application/json',
+        },
+      }
+    );
+
+    console.log(netposWebHook.data);
+  } catch (e) {
+    console.log(JSON.stringify(e));
+  }
+
   const user_type = await user.findOne({
     attributes: ['type'],
     where: {
@@ -193,6 +226,8 @@ const updateTransactionAndWalletBalance = async (req, res) => {
   if (user_type.dataValues.type != userType) {
     throw new BadRequestError('userType mismatch');
   }
+
+
 
   //logging the transaction
   const created_transaction = await transactions.create({
@@ -336,9 +371,17 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     }
 
     res.send('transaction created');
-  } else {
+  } 
+  else {
     throw new BadRequestError('invalid user type');
   }
+
+
+
+
+
+
+
 };
 
 const getOneTransactions = async (req, res) => {

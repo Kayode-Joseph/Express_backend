@@ -4,7 +4,7 @@
     "username": "root",
     "password": "secret",
     "database": "netplus_storm",
-    "host": "127.0.0.1",
+    "host": "localhost",
     "dialect": "mysql"
   },
   "test": {

@@ -176,6 +176,7 @@ const getStormUsers = async (req, res) => {
         attributes: ['business_name', 'email', 'mobile_number', 'storm_id' ,'terminal_id', 'is_transfer_enabled'],
         offset: 20 * page,
         limit: 20,
+        
       });
 
   Array.isArray(users)
@@ -240,6 +241,7 @@ const getTransactions = async (req, res) => {
         where: {
           storm_id: stormId,
         },
+        order: [['updatedAt', 'DESC']],
       })
     : await transactions.findAll({
         attributes: [
@@ -260,6 +262,7 @@ const getTransactions = async (req, res) => {
               terminal_id: tid,
             }
           : undefined,
+        order: [['updatedAt', 'DESC']],
       });
 
   Array.isArray(transaction_list)
@@ -463,7 +466,7 @@ const adminLogin = async (req, res) => {
   const [transaction_count, transaction_value] = await transactions_tracker();
 
   delete user_that_want_to_login.dataValues.password;
-  res.status(201).json({
+  res.status(200).json({
     admin: user_that_want_to_login,
     token: token,
     transaction_count: transaction_count,

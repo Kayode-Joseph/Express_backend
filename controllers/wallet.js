@@ -108,62 +108,33 @@ const debitWallet = async (req, res, next) => {
     throw new BadRequestError('invalid bank code');
   }
 
-  const user_from_database = await user.findOne({
-    attributes: ['type', 'terminal_id', 'is_transfer_enabled'],
-
-    where: {
-      storm_id: stormId,
-    },
-  });
-
-  if (!user_from_database) {
-    throw new Error('something went wrong');
-  }
-
-  if (user_from_database.dataValues.is_transfer_enabled === 'false') {
-    res.status(200).json({ code: 501, message: 'transfer disabled' });
-  }
-
-  const userType = user_from_database.dataValues.type;
-
-  const transactionFee = await transaction_fees.findOne({
-    attributes: ['transfer_out_fee'],
-
-    where: {
-      agent_type: userType,
-    },
-  });
-
-  if (!transactionFee) {
-    throw new BadRequestError('invalid user type');
-  }
-
-  const stormWallet = await storm_wallet.findOne({
-    where: {
-      storm_id: stormId,
-    },
-  });
-
-  if (!stormWallet) {
-    throw new Error('something went wrong');
-  }
-
-  const check_if_available_balance_is_sufficient_for_transaction = Math.sign(
-    stormWallet.dataValues.wallet_balance -
-      amount -
-      transactionFee.dataValues.transfer_out_fee
+  const {
+    stormWallet,
+    transactionFee,
+    check_if_available_balance_is_sufficient_for_transaction,
+    user_from_database,
+    userType,
+  } = await paymentValidator(
+    amount,
+    user,
+    storm_wallet,
+    stormId,
+    transaction_fees,
+    BadRequestError,
+    NotFoundError
   );
 
-  if (
-    check_if_available_balance_is_sufficient_for_transaction != 0 &&
-    check_if_available_balance_is_sufficient_for_transaction != 1 &&
-    check_if_available_balance_is_sufficient_for_transaction != -1
-  ) {
-    throw new BadRequestError('something went wrong');
+  if (user_from_database.dataValues.is_transfer_enabled != 'true') {
+    res.status(200).json({ code: 501, message: 'transfer disabled' });
+    return;
   }
 
-  if (check_if_available_balance_is_sufficient_for_transaction === -1) {
-    res.json({ code: 502, message: 'insufficient balance' });
+  if (check_if_available_balance_is_sufficient_for_transaction == -1) {
+    res.status(200).json({
+      code: 502,
+      message: 'insufficient balance please fund storm wallet',
+    });
+
     return;
   }
 
@@ -194,7 +165,7 @@ const debitWallet = async (req, res, next) => {
   let eTranzactResponse = null;
   try {
     eTranzactResponse = await axios.post(
-      'https://www.etranzact.net/rest/switchIT/api/v1/fund-transfer',
+      process.env.FTURL,
       {
         action: 'FT',
         terminalId: process.env.TID,
@@ -336,12 +307,10 @@ const verifyName = async (req, res, next) => {
   );
 
   if (eTranzactResponse.data.error === '0') {
-    res
-      .status(200)
-      .json({
-        code: eTranzactResponse.data.error,
-        message: eTranzactResponse.data.message,
-      });
+    res.status(200).json({
+      code: eTranzactResponse.data.error,
+      message: eTranzactResponse.data.message,
+    });
     return;
   } else if (eTranzactResponse.data.error == 24) {
     res.status(200).json({ code: 24, message: eTranzactResponse.data.message });
@@ -356,3 +325,71 @@ const verifyName = async (req, res, next) => {
   });
 };
 module.exports = { getBalance, createWallet, debitWallet, verifyName };
+
+const paymentValidator = async (
+  amount,
+  user,
+  storm_wallet,
+  stormId,
+  transaction_fees,
+  BadRequestError,
+  NotFoundError
+) => {
+  const user_from_database = await user.findOne({
+    attributes: ['type', 'terminal_id', 'is_transfer_enabled'],
+
+    where: {
+      storm_id: stormId,
+    },
+  });
+
+  if (!user_from_database) {
+    throw new NotFoundError('something went wrong');
+  }
+
+  const userType = user_from_database.dataValues.type;
+
+  const transactionFee = await transaction_fees.findOne({
+    attributes: ['transfer_out_fee'],
+
+    where: {
+      agent_type: userType,
+    },
+  });
+
+  if (!transactionFee) {
+    throw new BadRequestError('invalid user type');
+  }
+
+  const stormWallet = await storm_wallet.findOne({
+    where: {
+      storm_id: stormId,
+    },
+  });
+
+  if (!stormWallet) {
+    throw new Error('something went wrong');
+  }
+
+  const check_if_available_balance_is_sufficient_for_transaction = Math.sign(
+    stormWallet.dataValues.wallet_balance -
+      amount -
+      transactionFee.dataValues.transfer_out_fee
+  );
+
+  if (
+    check_if_available_balance_is_sufficient_for_transaction != 0 &&
+    check_if_available_balance_is_sufficient_for_transaction != 1 &&
+    check_if_available_balance_is_sufficient_for_transaction != -1
+  ) {
+    throw new BadRequestError('something went wrong');
+  }
+
+  return {
+    stormWallet,
+    transactionFee,
+    check_if_available_balance_is_sufficient_for_transaction,
+    user_from_database,
+    userType,
+  };
+};
