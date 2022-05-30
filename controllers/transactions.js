@@ -384,30 +384,89 @@ const updateTransactionAndWalletBalance = async (req, res) => {
 
 };
 
-const getOneTransactions = async (req, res) => {
-  const trans_id = req.params.rrn;
+const getTransactions = async (req, res) => {
+  
+  const stormId = req.params.stormId;
+
+  const rrn = req.query.rrn
+
+  const page= req.query.page
 
   const { userId } = req.user;
 
-  console.log(trans_id);
 
-  const transaction = await transactions.findOne({
-    where: {
-      rrn: trans_id,
-    },
-  });
+
+  if (isNaN(page)) {
+    throw new BadRequestError('page must be a number');
+  }
+
+  if (!rrn && !page) {
+    throw new BadRequestError('missing key query param');
+  }
+
+
+  if(!stormId){
+
+    throw UnauthenticatedError('unautheticated')
+  }
+
+  if(!userId){
+
+    throw new UnauthenticatedError("unauthenticated")
+  }
+
+  if(userId!=stormId){
+
+     throw UnauthenticatedError('unautheticated');
+  }
+
+  const transaction = rrn
+    ? await transactions.findOne({
+        where: {
+          rrn: rrn,
+          storm_id: stormId,
+        },
+        attributes: [
+          'storm_id',
+          'amount',
+          'rrn',
+          'createdAt',
+          'updatedAt',
+          'transaction_status',
+          'settlement_status',
+        ],
+      })
+    : await transactions.findAll({
+        where: {
+          storm_id: stormId,
+        },
+
+        attributes: [
+          'storm_id',
+          'amount',
+          'rrn',
+          'createdAt',
+          'updatedAt',
+          'transaction_status',
+          'settlement_status',
+        ],
+
+        offset: page * 20,
+
+        limit: 20,
+
+        order: [['updatedAt', 'DESC']],
+      });
 
   if (!transaction) {
-    throw new NotFoundError('transaction id not found');
+    throw new NotFoundError('transaction with rrn not found');
   }
 
-  if (transaction.dataValues.storm_id != userId) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
+ 
   res.status(200).json({ transaction });
 };
 
-//admin operation get all database transactions for a date range
+
 
 const getTransactionByDate = async (req, res) => {
   const { userId } = req.user;
@@ -449,11 +508,13 @@ const getTransactionByDate = async (req, res) => {
 
   const transaction = await transactions.findAll({
     where: {
-      createdAt: {
+      updatedAt: {
         [Op.lt]: dateToGetUpper,
         [Op.gt]: dateToGetLower,
       },
       storm_id: userId,
+
+      order: [['updatedAt', 'DESC']],
     },
   });
   res.send(transaction);
@@ -502,11 +563,15 @@ const getDebitTransactions = async (req, res) => {
   res.send(transaction_list);
 };
 
+
+
 module.exports = {
-  getOneTransactions,
+   getTransactions,
   getDebitTransactions,
 
   updateTransactionAndWalletBalance,
   getTransactionByDate,
   debit_transaction_getter
 };
+
+
