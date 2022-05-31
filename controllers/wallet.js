@@ -16,6 +16,77 @@ const {
 
 require('dotenv').config();
 
+//not a route
+
+const paymentValidator = async (
+  amount,
+  user,
+  storm_wallet,
+  stormId,
+  transaction_fees,
+  BadRequestError,
+  NotFoundError
+) => {
+  const user_from_database = await user.findOne({
+    attributes: ['type', 'terminal_id', 'is_transfer_enabled'],
+
+    where: {
+      storm_id: stormId,
+    },
+  });
+
+  if (!user_from_database) {
+    throw new NotFoundError('something went wrong');
+  }
+
+  const userType = user_from_database.dataValues.type;
+
+  const transactionFee = await transaction_fees.findOne({
+    attributes: ['transfer_out_fee'],
+
+    where: {
+      agent_type: userType,
+    },
+  });
+
+  if (!transactionFee) {
+    throw new BadRequestError('invalid user type');
+  }
+
+  const stormWallet = await storm_wallet.findOne({
+    where: {
+      storm_id: stormId,
+    },
+  });
+
+  if (!stormWallet) {
+    throw new Error('something went wrong');
+  }
+
+  const check_if_available_balance_is_sufficient_for_transaction = Math.sign(
+    stormWallet.dataValues.wallet_balance -
+      amount -
+      transactionFee.dataValues.transfer_out_fee
+  );
+
+  if (
+    check_if_available_balance_is_sufficient_for_transaction != 0 &&
+    check_if_available_balance_is_sufficient_for_transaction != 1 &&
+    check_if_available_balance_is_sufficient_for_transaction != -1
+  ) {
+    throw new BadRequestError('something went wrong');
+  }
+
+  return {
+    stormWallet,
+    transactionFee,
+    check_if_available_balance_is_sufficient_for_transaction,
+    user_from_database,
+    userType,
+  };
+};
+
+
 const getBalance = async (req, res) => {
   const { userId } = req.user;
 
@@ -324,72 +395,5 @@ const verifyName = async (req, res, next) => {
     message: eTranzactResponse.data.message,
   });
 };
-module.exports = { getBalance, createWallet, debitWallet, verifyName };
+module.exports = { getBalance, createWallet, debitWallet, verifyName, paymentValidator};
 
-const paymentValidator = async (
-  amount,
-  user,
-  storm_wallet,
-  stormId,
-  transaction_fees,
-  BadRequestError,
-  NotFoundError
-) => {
-  const user_from_database = await user.findOne({
-    attributes: ['type', 'terminal_id', 'is_transfer_enabled'],
-
-    where: {
-      storm_id: stormId,
-    },
-  });
-
-  if (!user_from_database) {
-    throw new NotFoundError('something went wrong');
-  }
-
-  const userType = user_from_database.dataValues.type;
-
-  const transactionFee = await transaction_fees.findOne({
-    attributes: ['transfer_out_fee'],
-
-    where: {
-      agent_type: userType,
-    },
-  });
-
-  if (!transactionFee) {
-    throw new BadRequestError('invalid user type');
-  }
-
-  const stormWallet = await storm_wallet.findOne({
-    where: {
-      storm_id: stormId,
-    },
-  });
-
-  if (!stormWallet) {
-    throw new Error('something went wrong');
-  }
-
-  const check_if_available_balance_is_sufficient_for_transaction = Math.sign(
-    stormWallet.dataValues.wallet_balance -
-      amount -
-      transactionFee.dataValues.transfer_out_fee
-  );
-
-  if (
-    check_if_available_balance_is_sufficient_for_transaction != 0 &&
-    check_if_available_balance_is_sufficient_for_transaction != 1 &&
-    check_if_available_balance_is_sufficient_for_transaction != -1
-  ) {
-    throw new BadRequestError('something went wrong');
-  }
-
-  return {
-    stormWallet,
-    transactionFee,
-    check_if_available_balance_is_sufficient_for_transaction,
-    user_from_database,
-    userType,
-  };
-};

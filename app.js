@@ -8,7 +8,6 @@ const cluster = require('cluster');
 
 const os = require('os');
 
-const redis = require('redis');
 
 const numCpu = os.cpus().length;
 
