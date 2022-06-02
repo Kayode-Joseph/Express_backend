@@ -177,7 +177,7 @@ const billPayment = async (req, res, next) => {
       }
     );
   } catch (e) {
-    bill.message = error.message;
+    bill.message = e.message;
 
     await bill.save({
       fields: ['message'],

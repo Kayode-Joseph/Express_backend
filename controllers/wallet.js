@@ -6,6 +6,9 @@ const {
 
 const axios = require('axios').default;
 
+
+const bcrypt = require('bcrypt');
+
 const {
   storm_wallet,
   debit_wallet_transactions,
@@ -25,8 +28,27 @@ const paymentValidator = async (
   stormId,
   transaction_fees,
   BadRequestError,
-  NotFoundError
+  NotFoundError,
+  pin
 ) => {
+  const stormWallet = await storm_wallet.findOne({
+    where: {
+      storm_id: stormId,
+    },
+  });
+
+  if (!stormWallet) {
+    throw new Error('something went wrong');
+  }
+
+  const database_pin = stormWallet.dataValues.pin;
+
+  const is_pin_the_same = await bcrypt.compare(pin, database_pin);
+
+  if (is_pin_the_same != true) {
+    throw new UnauthenticatedError('wrong pin!');
+  }
+
   const user_from_database = await user.findOne({
     attributes: ['type', 'terminal_id', 'is_transfer_enabled'],
 
@@ -53,16 +75,6 @@ const paymentValidator = async (
     throw new BadRequestError('invalid user type');
   }
 
-  const stormWallet = await storm_wallet.findOne({
-    where: {
-      storm_id: stormId,
-    },
-  });
-
-  if (!stormWallet) {
-    throw new Error('something went wrong');
-  }
-
   const check_if_available_balance_is_sufficient_for_transaction = Math.sign(
     stormWallet.dataValues.wallet_balance -
       amount -
@@ -85,7 +97,6 @@ const paymentValidator = async (
     userType,
   };
 };
-
 
 const getBalance = async (req, res) => {
   const { userId } = req.user;
@@ -146,6 +157,7 @@ const debitWallet = async (req, res, next) => {
     stormId,
 
     amount,
+    pin
   } = req.body;
 
   if (
@@ -154,7 +166,8 @@ const debitWallet = async (req, res, next) => {
     !recieverName ||
     !senderName ||
     !amount ||
-    !bankCode
+    !bankCode ||
+    !pin
   ) {
     throw new BadRequestError('missing field');
   }
@@ -184,7 +197,7 @@ const debitWallet = async (req, res, next) => {
     transactionFee,
     check_if_available_balance_is_sufficient_for_transaction,
     user_from_database,
-    userType,
+    userType
   } = await paymentValidator(
     amount,
     user,
@@ -192,7 +205,8 @@ const debitWallet = async (req, res, next) => {
     stormId,
     transaction_fees,
     BadRequestError,
-    NotFoundError
+    NotFoundError, 
+    pin
   );
 
   if (user_from_database.dataValues.is_transfer_enabled != 'true') {
@@ -395,5 +409,10 @@ const verifyName = async (req, res, next) => {
     message: eTranzactResponse.data.message,
   });
 };
-module.exports = { getBalance, createWallet, debitWallet, verifyName, paymentValidator};
-
+module.exports = {
+  getBalance,
+  createWallet,
+  debitWallet,
+  verifyName,
+  paymentValidator,
+};

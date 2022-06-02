@@ -79,7 +79,7 @@ module.exports = (sequelize, DataTypes) => {
         validator: { notNull: true },
       },
       type: {
-        type: DataTypes.ENUM('merchant', 'agent_1','agent_2'),
+        type: DataTypes.ENUM('merchant', 'agent_1', 'agent_2'),
         validate: { isIn: [['merchant', 'agent_1', 'agent_2']] },
         allowNull: true,
         defaultValue: 'agent_2',
@@ -99,6 +99,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         default: 'user',
       },
+      
     },
 
     {

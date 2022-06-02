@@ -13,7 +13,8 @@ const {
   transactionsTrackerRoute,
   getStormUsers,
   createTerminalId,
-  getDebitTransactions
+  getDebitTransactions,
+  getTerminalIds
   
 } = require('../controllers/admin');
 
@@ -27,6 +28,8 @@ routers.route('/add').put(adminAuth, addTerminalId);
  routers.route('/transaction').get(adminAuth,getTransactions)
 
  routers.route('/tid').post(adminAuth, createTerminalId )
+
+  routers.route('/tid').get(adminAuth, getTerminalIds);
 
 
 

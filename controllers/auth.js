@@ -52,6 +52,7 @@ const login = async (req, res) => {
       });
 
       delete user_that_want_to_login.dataValues.password;
+      delete user_that_want_to_login.dataValues.storm_wallet.dataValues.pin;
 
       res.status(200).json({ token: token, user: user_that_want_to_login });
     } catch (e) {
@@ -74,6 +75,7 @@ const register = async (req, res) => {
     accountNumber,
     bvn,
     userType,
+    walletPin
   } = req.body;
 
   if (
@@ -83,14 +85,25 @@ const register = async (req, res) => {
     !mobileNumber ||
     !accountNumber ||
     !bvn ||
-    !userType
+    !userType||
+    !walletPin
   ) {
     throw new BadRequestError('missing field');
   }
 
+  if (walletPin.length!=4){
+
+     throw new BadRequestError('wrong wallet pin format');
+  }
+
+   if (password.length<3) {
+     throw new BadRequestError('password too short');
+   }
   const salt = await bcrypt.genSalt(10);
 
   const hashed_password = await bcrypt.hash(password, salt);
+
+  const wallet_pin = await bcrypt.hash(walletPin, salt);
 
   const new_user = await user.create({
     email: email,
@@ -105,6 +118,8 @@ const register = async (req, res) => {
 
     bvn: bvn,
     type: userType,
+
+
   });
 
   if (!new_user) {
@@ -117,6 +132,7 @@ const register = async (req, res) => {
     storm_id: stormId,
     wallet_balance: 0,
     ledger_balance: 0,
+    pin: wallet_pin
   });
 
   if (!check_return) {
@@ -124,6 +140,7 @@ const register = async (req, res) => {
   }
 
   delete new_user.dataValues.password;
+
 
   let token = null;
   try {

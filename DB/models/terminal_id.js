@@ -17,6 +17,10 @@ module.exports = (sequelize, DataTypes) => {
     {
       terminal_id: { type: DataTypes.STRING, primaryKey: true },
       merchant_id: { type: DataTypes.STRING },
+      is_assigned: {
+        type: DataTypes.BOOLEAN,
+        defaultValue:false
+      },
     },
     {
       sequelize,

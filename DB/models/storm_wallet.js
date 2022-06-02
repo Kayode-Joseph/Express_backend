@@ -28,6 +28,12 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         validator: { notNull: true, isDecimal: true },
       },
+      pin: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      
+      },
+
     },
     {
       sequelize,

@@ -6,7 +6,7 @@ const {
 
 const { Op } = require('sequelize');
 
-const {   debit_transaction_getter }= require('./transactions')
+const { debit_transaction_getter } = require('./transactions');
 
 const {
   user,
@@ -31,7 +31,7 @@ const transactions_tracker = async () => {
 
   const date_in_millis = new Date().getTime();
 
- // console.log(date_in_millis);
+  // console.log(date_in_millis);
 
   const dateToGetUpper = new Date(date_in_millis);
 
@@ -114,12 +114,26 @@ const addTerminalId = async (req, res) => {
     },
   });
 
+  const terminal_id_from_db = await terminal_id.findOne({
+    where: {
+      terminal_id: terminalId,
+    },
+  });
+
+  if (!terminal_id_from_db) {
+    throw new Error('something went wrong');
+  }
+
   if (!user_to_update) {
     throw new NotFoundError('cannot find user');
   }
 
   if (terminalId) {
     user_to_update.terminal_id = terminalId;
+    terminal_id_from_db.is_assigned = true;
+
+    await terminal_id_from_db.save({ fields: ['is_assigned'] });
+
     await user_to_update.save({ fields: ['terminal_id'] });
   }
   if (isTransferEnabled) {
@@ -134,7 +148,7 @@ const addTerminalId = async (req, res) => {
 
   if (terminalId && isTransferEnabled === 'false') {
     res.send('terminal id and transfer disabled');
-    return
+    return;
   }
 
   terminalId
@@ -166,17 +180,30 @@ const getStormUsers = async (req, res) => {
 
   const users = stormId
     ? await user.findOne({
-        attributes: ['business_name', 'email', 'mobile_number', 'storm_id', 'terminal_id', 'is_transfer_enabled'],
+        attributes: [
+          'business_name',
+          'email',
+          'mobile_number',
+          'storm_id',
+          'terminal_id',
+          'is_transfer_enabled',
+        ],
 
         where: {
           storm_id: stormId,
         },
       })
     : await user.findAll({
-        attributes: ['business_name', 'email', 'mobile_number', 'storm_id' ,'terminal_id', 'is_transfer_enabled'],
+        attributes: [
+          'business_name',
+          'email',
+          'mobile_number',
+          'storm_id',
+          'terminal_id',
+          'is_transfer_enabled',
+        ],
         offset: 20 * page,
         limit: 20,
-        
       });
 
   Array.isArray(users)
@@ -500,53 +527,73 @@ const createTerminalId = async (req, res) => {
   res.status(200).send('terminal Id created');
 };
 
+const getDebitTransactions = async (req, res) => {
+  const { userId } = req.user;
 
-const getDebitTransactions= async (req,res)=>{
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
 
-const { userId } = req.user;
+  const stormId = req.query.stormId;
 
-if (!userId) {
-  throw new UnauthenticatedError('UNAUTHORIZED');
-}
+  const page = req.query.page;
 
- const stormId = req.query.stormId;
+  const reference = req.query.reference;
 
- const page = req.query.page;
+  const terminalId = req.query.terminalId;
 
- const reference = req.query.reference;
+  if (isNaN(page)) {
+    throw new BadRequestError('page must be a number');
+  }
 
- const terminalId = req.query.terminalId;
+  if (!reference && !page) {
+    throw new BadRequestError('missing key query param');
+  }
 
- if (isNaN(page)) {
-   throw new BadRequestError('page must be a number');
- }
+  const transaction_list = await debit_transaction_getter(
+    stormId,
+    page,
+    terminalId,
+    reference
+  );
 
- if (!reference && !page) {
-   throw new BadRequestError('missing key query param');
- }
+  if (!transaction_list) {
+    throw new Error('Something went wrong');
+  }
 
- const transaction_list = await debit_transaction_getter(
-   stormId,
-   page,
-   terminalId,
-   reference
- );
+  if (transaction_list[0] == null) {
+    res.send([]);
+  }
 
- if (!transaction_list) {
-   throw new Error('Something went wrong');
- }
+  res.send(transaction_list);
+};
 
- if (transaction_list[0] == null) {
-   res.send([]);
- }
+const getTerminalIds = async (req, res) => {
+  const { userId } = req.user;
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
 
- res.send(transaction_list);
+  const page = req.query.page;
 
+  if (isNaN(page)) {
+    throw new BadRequestError('page must be a number');
+  }
 
+  const terminalIds = await terminal_id.findAll({
+    offset: 20 * page,
+    limit: 20,
+    order: [['updatedAt', 'DESC']],
+  });
 
+  
 
-
-}
+  res.json({
+    page: page,
+    length: terminalIds.length,
+    result: terminalIds,
+  });
+};
 
 module.exports = {
   addTerminalId,
@@ -557,5 +604,6 @@ module.exports = {
   transactionsTrackerRoute,
   getStormUsers,
   createTerminalId,
-  getDebitTransactions
+  getDebitTransactions,
+  getTerminalIds
 };
