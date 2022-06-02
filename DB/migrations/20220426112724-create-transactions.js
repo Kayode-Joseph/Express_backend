@@ -22,13 +22,10 @@ module.exports = {
         type: DataTypes.STRING,
       },
       rrn: {
-        primaryKey: true,
         type: DataTypes.STRING,
-        allowNull: false,
       },
       stan: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
       tsi: {
         type: DataTypes.STRING,
@@ -38,7 +35,6 @@ module.exports = {
       },
       account_type: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
 
       acquiring_inst_code: {
@@ -49,7 +45,6 @@ module.exports = {
       },
       amount: {
         type: DataTypes.DOUBLE,
-        allowNull: false,
       },
       app_cryptogram: {
         type: DataTypes.STRING,
@@ -63,29 +58,23 @@ module.exports = {
 
       card_holder: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
 
       card_label: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
 
       local_date_13: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
       local_date_12: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
       masked_pan: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
       merchant_id: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
       original_forwarding_inst_code: {
         type: DataTypes.STRING,
@@ -101,21 +90,18 @@ module.exports = {
       },
       response_code: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
       response_de55: {
         type: DataTypes.TEXT,
       },
       terminal_id: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
       transaction_time_in_mills: {
         type: DataTypes.BIGINT,
       },
       transaction_type: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
       transmission_date_time: {
         type: DataTypes.STRING,
@@ -129,13 +115,24 @@ module.exports = {
         type: DataTypes.ENUM('approved', 'declined'),
       },
       settlement_status: {
-        allowNull: false,
         type: DataTypes.STRING,
       },
       routing_channel: {
-        allowNull: false,
         type: DataTypes.STRING,
       },
+      bank_code: DataTypes.STRING,
+      reference: DataTypes.STRING,
+      reference_from_etranzact: DataTypes.STRING,
+      description: DataTypes.STRING,
+      destination: DataTypes.STRING,
+      sender_name: DataTypes.STRING,
+      endPoint: DataTypes.STRING,
+
+      transaction_fee: {
+        type: DataTypes.DOUBLE,
+        defaultValue: '0.00',
+      },
+      transaction_type: DataTypes.STRING,
 
       createdAt: {
         allowNull: false,
@@ -144,6 +141,12 @@ module.exports = {
       updatedAt: {
         allowNull: false,
         type: DataTypes.DATE,
+      },
+      response_code: {
+        type: DataTypes.STRING,
+      },
+      response_message: {
+        type: DataTypes.STRING,
       },
     });
   },

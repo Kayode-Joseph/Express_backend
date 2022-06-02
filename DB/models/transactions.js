@@ -18,7 +18,7 @@ module.exports = (sequelize, DataTypes) => {
       id: {
         allowNull: true,
         autoIncrement: true,
-        unique: true,
+        primaryKey: true,
         type: DataTypes.INTEGER,
       },
       aid: {
@@ -29,13 +29,12 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       rrn: {
-        primaryKey: true,
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
       stan: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
       tsi: {
         type: DataTypes.STRING,
@@ -45,7 +44,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       account_type: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
 
       acquiring_inst_code: {
@@ -56,11 +55,27 @@ module.exports = (sequelize, DataTypes) => {
       },
       amount: {
         type: DataTypes.FLOAT,
-        allowNull: false,
+        defaultValue: '0.00',
         validator: { notNull: true, isDecimal: true },
       },
       app_cryptogram: {
         type: DataTypes.STRING,
+      },
+      bank_code: DataTypes.STRING,
+      reference: DataTypes.STRING,
+      reference_from_etranzact: DataTypes.STRING,
+      description: DataTypes.STRING,
+      destination: DataTypes.STRING,
+      sender_name: DataTypes.STRING,
+      endPoint: DataTypes.STRING,
+      status: {
+        type: DataTypes.ENUM('approved', 'declined'),
+        allowNull: true,
+      },
+      response_message: DataTypes.STRING,
+      transaction_fee: {
+        type: DataTypes.DOUBLE,
+        defaultValue: '0.00',
       },
       auth_code: {
         type: DataTypes.STRING,
@@ -71,55 +86,57 @@ module.exports = (sequelize, DataTypes) => {
 
       card_holder: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
 
       card_label: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
 
       local_date_13: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
       local_date_12: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
       masked_pan: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
       merchant_id: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
+      },
+      original_forwarding_inst_code: {
+        type: DataTypes.STRING,
       },
       original_forwarding_inst_code: {
         type: DataTypes.STRING,
       },
       transaction_type: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
       other_amount: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
+        type: DataTypes.FLOAT,
+        defaultValue: '0.00',
       },
       other_id: {
         type: DataTypes.STRING,
       },
       response_code: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
       response_de55: {
         type: DataTypes.TEXT,
       },
       terminal_id: {
         type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,
+        allowNull: true,
       },
       transaction_time_in_mills: {
         type: DataTypes.BIGINT,
@@ -136,16 +153,22 @@ module.exports = (sequelize, DataTypes) => {
         validator: { notNull: true },
       },
       transaction_status: {
-        allowNull: false,
+        allowNull: true,
         type: DataTypes.ENUM('approved', 'declined'),
-        validate: { isIn: [['approved', 'declined']] },
       },
       settlement_status: {
-        allowNull: false,
+        allowNull: true,
         type: DataTypes.STRING,
       },
       routing_channel: {
-        allowNull: false,
+        allowNull: true,
+        type: DataTypes.STRING,
+      },
+      transaction_type: DataTypes.STRING,
+      response_code: {
+        type: DataTypes.STRING,
+      },
+      response_message: {
         type: DataTypes.STRING,
       },
     },

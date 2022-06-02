@@ -2,8 +2,6 @@ const { Op } = require('sequelize');
 
 const axios = require('axios').default;
 
-
-
 const {
   NotFoundError,
   UnauthenticatedError,
@@ -16,7 +14,7 @@ const {
   storm_wallet,
   merchant_transaction_cache,
   transaction_fees,
-  debit_wallet_transactions,
+
 } = require('../DB/models');
 
 //not a route, function to get debit wallet transactions
@@ -27,7 +25,7 @@ const debit_transaction_getter = async (
   reference
 ) => {
   const transactionList = reference
-    ? await debit_wallet_transactions.findOne({
+    ? await transactions.findOne({
         attributes: [
           'reference',
           'amount',
@@ -37,7 +35,7 @@ const debit_transaction_getter = async (
           'storm_id',
           'terminal_id',
           'reference_from_etranzact',
-          'status',
+          'transaction_status',
           'terminal_id',
           'reference_from_etranzact',
           'response_code',
@@ -47,10 +45,11 @@ const debit_transaction_getter = async (
 
         where: {
           reference: reference,
+          transaction_type: 'debit',
         },
       })
     : stormId
-    ? await debit_wallet_transactions.findAll({
+    ? await transactions.findAll({
         attributes: [
           'reference',
           'amount',
@@ -60,7 +59,7 @@ const debit_transaction_getter = async (
           'storm_id',
           'terminal_id',
           'reference_from_etranzact',
-          'status',
+          'transaction_status',
           'terminal_id',
           'reference_from_etranzact',
           'response_code',
@@ -70,6 +69,7 @@ const debit_transaction_getter = async (
 
         where: {
           storm_id: stormId,
+          transaction_type: 'debit',
         },
 
         offset: page * 20,
@@ -79,7 +79,7 @@ const debit_transaction_getter = async (
         order: [['updatedAt', 'DESC']],
       })
     : terminalId
-    ? await debit_wallet_transactions.findAll({
+    ? await transactions.findAll({
         attributes: [
           'reference',
           'amount',
@@ -89,7 +89,7 @@ const debit_transaction_getter = async (
           'storm_id',
           'terminal_id',
           'reference_from_etranzact',
-          'status',
+          'transaction_status',
           'terminal_id',
           'reference_from_etranzact',
           'response_code',
@@ -99,6 +99,7 @@ const debit_transaction_getter = async (
 
         where: {
           terminal_id: terminalId,
+          transaction_type: 'debit',
         },
 
         order: [['updatedAt', 'DESC']],
@@ -107,7 +108,7 @@ const debit_transaction_getter = async (
 
         limit: 20,
       })
-    : await debit_wallet_transactions.findAll({
+    : await transactions.findAll({
         attributes: [
           'reference',
           'amount',
@@ -117,7 +118,7 @@ const debit_transaction_getter = async (
           'storm_id',
           'terminal_id',
           'reference_from_etranzact',
-          'status',
+          'transaction_status',
           'terminal_id',
           'reference_from_etranzact',
           'response_code',
@@ -125,6 +126,10 @@ const debit_transaction_getter = async (
           'updatedAt',
         ],
         offset: page * 20,
+
+        where: {
+             transaction_type: 'debit',
+        },
 
         limit: 20,
 
@@ -211,7 +216,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
       }
     );
 
-    console.log(netposWebHook.data);
+
   } catch (e) {
     console.log(JSON.stringify(e));
   }
@@ -226,8 +231,6 @@ const updateTransactionAndWalletBalance = async (req, res) => {
   if (user_type.dataValues.type != userType) {
     throw new BadRequestError('userType mismatch');
   }
-
-
 
   //logging the transaction
   const created_transaction = await transactions.create({
@@ -264,6 +267,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     user_type: userType,
     transaction_status: transactionStatus,
     routing_channel: routingChannel,
+    transaction_type: "credit"
   });
 
   if (transactionStatus === 'declined') {
@@ -279,8 +283,6 @@ const updateTransactionAndWalletBalance = async (req, res) => {
       agent_type: userType,
     },
   });
-
-
 
   if (!transactionFee) {
     throw new BadRequestError('wrong user type');
@@ -371,30 +373,19 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     }
 
     res.send('transaction created');
-  } 
-  else {
+  } else {
     throw new BadRequestError('invalid user type');
   }
-
-
-
-
-
-
-
 };
 
 const getTransactions = async (req, res) => {
-  
   const stormId = req.params.stormId;
 
-  const rrn = req.query.rrn
+  const rrn = req.query.rrn;
 
-  const page= req.query.page
+  const page = req.query.page;
 
   const { userId } = req.user;
-
-
 
   if (isNaN(page)) {
     throw new BadRequestError('page must be a number');
@@ -404,20 +395,16 @@ const getTransactions = async (req, res) => {
     throw new BadRequestError('missing key query param');
   }
 
-
-  if(!stormId){
-
-    throw UnauthenticatedError('unautheticated')
+  if (!stormId) {
+    throw UnauthenticatedError('unautheticated');
   }
 
-  if(!userId){
-
-    throw new UnauthenticatedError("unauthenticated")
+  if (!userId) {
+    throw new UnauthenticatedError('unauthenticated');
   }
 
-  if(userId!=stormId){
-
-     throw UnauthenticatedError('unautheticated');
+  if (userId != stormId) {
+    throw new UnauthenticatedError('unautheticated');
   }
 
   const transaction = rrn
@@ -432,8 +419,15 @@ const getTransactions = async (req, res) => {
           'rrn',
           'createdAt',
           'updatedAt',
+          'reference',
+          'amount',
+          'transaction_fee',
+          'description',
+          'destination',
+          'storm_id',
           'transaction_status',
           'settlement_status',
+          'trasnaction_type'
         ],
       })
     : await transactions.findAll({
@@ -449,6 +443,13 @@ const getTransactions = async (req, res) => {
           'updatedAt',
           'transaction_status',
           'settlement_status',
+          'reference',
+          'amount',
+          'transaction_fee',
+          'description',
+          'destination',
+          'storm_id',
+          'transaction_type'
         ],
 
         offset: page * 20,
@@ -462,11 +463,8 @@ const getTransactions = async (req, res) => {
     throw new NotFoundError('transaction with rrn not found');
   }
 
- 
   res.status(200).json({ transaction });
 };
-
-
 
 const getTransactionByDate = async (req, res) => {
   const { userId } = req.user;
@@ -563,15 +561,11 @@ const getDebitTransactions = async (req, res) => {
   res.send(transaction_list);
 };
 
-
-
 module.exports = {
-   getTransactions,
+  getTransactions,
   getDebitTransactions,
 
   updateTransactionAndWalletBalance,
   getTransactionByDate,
-  debit_transaction_getter
+  debit_transaction_getter,
 };
-
-

@@ -11,7 +11,7 @@ const bcrypt = require('bcrypt');
 
 const {
   storm_wallet,
-  debit_wallet_transactions,
+  transactions,
   transaction_fees,
   user,
   banks,
@@ -38,7 +38,7 @@ const paymentValidator = async (
   });
 
   if (!stormWallet) {
-    throw new Error('something went wrong');
+    throw new NotFoundError('something went wrong');
   }
 
   const database_pin = stormWallet.dataValues.pin;
@@ -232,7 +232,7 @@ const debitWallet = async (req, res, next) => {
     8
   )} to ${recieverName.substring(0, 8)} via NetPos`;
 
-  const debitTransaction = await debit_wallet_transactions.create({
+  const debitTransaction = await transactions.create({
     bank_code: bankCode,
     amount: -amount,
     reference: referenceRandom,
@@ -242,9 +242,10 @@ const debitWallet = async (req, res, next) => {
     endPoint: 'A',
     terminal_id: user_from_database.dataValues.terminal_id,
     storm_id: stormId,
-    status: 'declined',
+    trasaction_status: 'declined',
     user_type: userType,
     transaction_fee: -transactionFee.dataValues.transfer_out_fee,
+    transaction_type: 'debit',
   });
 
   let eTranzactResponse = null;
@@ -271,6 +272,8 @@ const debitWallet = async (req, res, next) => {
       { timeout: 32000 }
     );
   } catch (error) {
+
+    console.log(error)
     debitTransaction.response_code = 500;
 
     debitTransaction.response_message = error.message;
@@ -318,7 +321,7 @@ const debitWallet = async (req, res, next) => {
         'reference_from_etranzact',
         'response_code',
         'response_message',
-        'status',
+        'transaction_status',
       ],
     });
 
@@ -348,7 +351,7 @@ const debitWallet = async (req, res, next) => {
       'reference_from_etranzact',
       'response_code',
       'response_message',
-      'status',
+      'transaction_status',
     ],
   });
 

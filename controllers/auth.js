@@ -13,7 +13,12 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const login = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, type } = req.body;
+
+  if(!email||!password||!type){
+
+    throw new BadRequestError('missing fields')
+  }
 
   const user_that_want_to_login = await user.findOne({
     attributes: [
@@ -31,6 +36,7 @@ const login = async (req, res) => {
 
     where: {
       email: email,
+      type: type
     },
     include: storm_wallet,
   });
