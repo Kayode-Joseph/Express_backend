@@ -9,9 +9,8 @@ const { getTransactions, updateTransactionAndWalletBalance, getTransactionByDate
 //routers.route('/').get(getTransactions)
 
 
-routers.route('/date').post(getTransactionByDate);
 
-routers.route('/debit').get(getDebitTransactions);
+
 
 routers.route('/:stormId').post(updateTransactionAndWalletBalance).get(getTransactions)
 

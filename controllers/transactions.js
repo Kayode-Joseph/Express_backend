@@ -14,7 +14,6 @@ const {
   storm_wallet,
   merchant_transaction_cache,
   transaction_fees,
-
 } = require('../DB/models');
 
 //not a route, function to get debit wallet transactions
@@ -128,7 +127,7 @@ const debit_transaction_getter = async (
         offset: page * 20,
 
         where: {
-             transaction_type: 'debit',
+          transaction_type: 'debit',
         },
 
         limit: 20,
@@ -215,8 +214,6 @@ const updateTransactionAndWalletBalance = async (req, res) => {
         },
       }
     );
-
-
   } catch (e) {
     console.log(JSON.stringify(e));
   }
@@ -267,7 +264,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     user_type: userType,
     transaction_status: transactionStatus,
     routing_channel: routingChannel,
-    transaction_type: "credit"
+    transaction_type: 'credit',
   });
 
   if (transactionStatus === 'declined') {
@@ -385,6 +382,12 @@ const getTransactions = async (req, res) => {
 
   const page = req.query.page;
 
+  const reference = req.query.reference;
+
+  const dateLowerBound = req.query.dateLowerBound;
+
+  const dateUpperBound = req.query.dateUpperBound;
+
   const { userId } = req.user;
 
   if (isNaN(page)) {
@@ -393,6 +396,18 @@ const getTransactions = async (req, res) => {
 
   if (!rrn && !page) {
     throw new BadRequestError('missing key query param');
+  }
+
+  if (!reference && !page) {
+    throw new BadRequestError('missing key query param');
+  }
+
+  if (dateLowerBound && !dateUpperBound) {
+    throw new BadRequestError('date lower bound requires date upper bound');
+  }
+
+  if (!dateLowerBound && dateUpperBound) {
+    throw new BadRequestError('date upper bound requires date lower bound');
   }
 
   if (!stormId) {
@@ -407,12 +422,52 @@ const getTransactions = async (req, res) => {
     throw new UnauthenticatedError('unautheticated');
   }
 
+  let dateValidityChecker = false;
+
+      let dateLowerBound_in_milliseconds= null
+
+      let dateUpperBound_in_milliseconds=null
+
+  if (dateLowerBound && dateLowerBound) {
+    dateLowerBound_in_milliseconds = new Date(
+      dateLowerBound + ' 00:00'
+    ).getTime();
+
+     dateUpperBound_in_milliseconds = new Date(
+      dateUpperBound + ' 00:00'
+    ).getTime();
+
+    function dateIsValid(date) {
+      return new Date(date) instanceof Date && !isNaN(date);
+    }
+
+
+
+    if (
+      !dateIsValid(dateLowerBound_in_milliseconds) ||
+      !dateIsValid(dateUpperBound_in_milliseconds)
+    ) {
+      throw new BadRequestError('invalid date fromat');
+    }
+
+    dateValidityChecker = true;
+  }
+
   const transaction = rrn
     ? await transactions.findOne({
-        where: {
-          rrn: rrn,
-          storm_id: stormId,
-        },
+        where: dateValidityChecker
+          ? {
+              rrn: rrn,
+              storm_id: stormId,
+              updatedAt: {
+                [Op.lt]: dateUpperBound_in_milliseconds,
+                [Op.gt]: dateLowerBound_in_milliseconds,
+              },
+            }
+          : {
+              rrn: rrn,
+              storm_id: stormId,
+            },
         attributes: [
           'storm_id',
           'amount',
@@ -427,13 +482,55 @@ const getTransactions = async (req, res) => {
           'storm_id',
           'transaction_status',
           'settlement_status',
-          'trasnaction_type'
+          'transaction_type',
+        ],
+      })
+    : reference
+    ? await transactions.findOne({
+        where: dateValidityChecker
+          ? {
+              reference: reference,
+              storm_id: stormId,
+              transaction_type: 'debit',
+              updatedAt: {
+                [Op.lt]: dateUpperBound_in_milliseconds,
+                [Op.gt]: dateLowerBound_in_milliseconds,
+              },
+            }
+          : {
+              reference: reference,
+              storm_id: stormId,
+              transaction_type: 'debit',
+            },
+        attributes: [
+          'storm_id',
+          'amount',
+          'rrn',
+          'createdAt',
+          'updatedAt',
+          'reference',
+          'amount',
+          'transaction_fee',
+          'description',
+          'destination',
+          'storm_id',
+          'transaction_status',
+          'settlement_status',
+          'transaction_type',
         ],
       })
     : await transactions.findAll({
-        where: {
-          storm_id: stormId,
-        },
+        where: dateValidityChecker
+          ? {
+              storm_id: stormId,
+              updatedAt: {
+                [Op.lt]: dateUpperBound_in_milliseconds,
+                [Op.gt]: dateLowerBound_in_milliseconds,
+              },
+            }
+          : {
+              storm_id: stormId,
+            },
 
         attributes: [
           'storm_id',
@@ -449,7 +546,7 @@ const getTransactions = async (req, res) => {
           'description',
           'destination',
           'storm_id',
-          'transaction_type'
+          'transaction_type',
         ],
 
         offset: page * 20,
@@ -479,9 +576,6 @@ const getTransactionByDate = async (req, res) => {
     throw new UnauthenticatedError('NOT AUTHORIZED');
   }
 
-  console.log(dateUpperBound);
-  //month first in req body
-
   const dateLowerBound_in_milliseconds = new Date(
     dateLowerBound + ' 00:00'
   ).getTime();
@@ -490,9 +584,16 @@ const getTransactionByDate = async (req, res) => {
     dateUpperBound + ' 00:00'
   ).getTime();
 
-  console.log(dateUpperBound_in_milliseconds);
+  function dateIsValid(date) {
+    return date instanceof Date && !isNaN(date);
+  }
 
-  console.log('date lupper millis' + dateUpperBound_in_milliseconds);
+  if (
+    !dateIsValid(dateLowerBound_in_milliseconds) ||
+    !dateIsValid(dateLowerBound)
+  ) {
+    throw new BadRequestError('invalid date fromat');
+  }
 
   const dateToGetLower = new Date(dateLowerBound_in_milliseconds);
 
@@ -500,11 +601,24 @@ const getTransactionByDate = async (req, res) => {
     dateUpperBound_in_milliseconds + 86400 * 1000
   );
 
-  console.log('date' + dateToGetLower);
-
-  console.log(dateToGetUpper);
-
   const transaction = await transactions.findAll({
+    attributes: [
+      'storm_id',
+      'amount',
+      'rrn',
+      'createdAt',
+      'updatedAt',
+      'transaction_status',
+      'settlement_status',
+      'reference',
+      'amount',
+      'transaction_fee',
+      'description',
+      'destination',
+      'storm_id',
+      'transaction_type',
+    ],
+
     where: {
       updatedAt: {
         [Op.lt]: dateToGetUpper,
@@ -516,8 +630,6 @@ const getTransactionByDate = async (req, res) => {
     },
   });
   res.send(transaction);
-
-  console.log('get transaction by date');
 };
 
 const getDebitTransactions = async (req, res) => {

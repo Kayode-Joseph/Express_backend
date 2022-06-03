@@ -350,8 +350,7 @@ const debitWallet = async (req, res, next) => {
     fields: [
       'reference_from_etranzact',
       'response_code',
-      'response_message',
-      'transaction_status',
+      'response_message'
     ],
   });
 
