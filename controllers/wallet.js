@@ -242,7 +242,7 @@ const debitWallet = async (req, res, next) => {
     endPoint: 'A',
     terminal_id: user_from_database.dataValues.terminal_id,
     storm_id: stormId,
-    trasaction_status: 'declined',
+    transaction_status: 'declined',
     user_type: userType,
     transaction_fee: -transactionFee.dataValues.transfer_out_fee,
     transaction_type: 'debit',

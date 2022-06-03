@@ -577,11 +577,11 @@ const getTransactionByDate = async (req, res) => {
   }
 
   const dateLowerBound_in_milliseconds = new Date(
-    dateLowerBound + ' 00:00'
+    dateLowerBound + ' 01:00'
   ).getTime();
 
   const dateUpperBound_in_milliseconds = new Date(
-    dateUpperBound + ' 00:00'
+    dateUpperBound + ' 01:00'
   ).getTime();
 
   function dateIsValid(date) {
