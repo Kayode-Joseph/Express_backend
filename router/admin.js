@@ -14,7 +14,9 @@ const {
   getStormUsers,
   createTerminalId,
   getDebitTransactions,
-  getTerminalIds
+  getTerminalIds,
+  changeAgentType,
+  changePassword
   
 } = require('../controllers/admin');
 
@@ -38,6 +40,10 @@ routers.route('/login').post(adminLogin);
 routers.route('/track').get(adminAuth, transactionsTrackerRoute)
 
 routers.route('/users').get(adminAuth, getStormUsers);
+
+routers.route('/users/type').put(adminAuth, changeAgentType);
+
+routers.route('/users/password').put(adminAuth, changePassword);
 
 routers.route('/debit').get(adminAuth,getDebitTransactions)
 

@@ -314,7 +314,7 @@ const debitWallet = async (req, res, next) => {
 
     debitTransaction.response_message = eTranzactResponse.data.message;
 
-    debitTransaction.status = 'approved';
+    debitTransaction.transaction_status = 'approved';
 
     await debitTransaction.save({
       fields: [

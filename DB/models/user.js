@@ -13,6 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       transactions,
       storm_wallet,
       merchant_transaction_cache,
+      terminal_id
     }) {
       this.hasMany(transactions, {
         foreignKey: 'storm_id',
@@ -29,6 +30,7 @@ module.exports = (sequelize, DataTypes) => {
         onUpdate: 'NO ACTION',
         onDelete: 'CASCADE',
       });
+     
     }
 
     toJSON() {
@@ -88,6 +90,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: true,
         defaultValue: null,
+        
       },
       is_transfer_enabled: {
         type: DataTypes.ENUM('true', 'false'),

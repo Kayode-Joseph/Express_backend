@@ -6,6 +6,8 @@ const {
 
 const { Op } = require('sequelize');
 
+const Sequelize = require('sequelize');
+
 const { debit_transaction_getter } = require('./transactions');
 
 const {
@@ -25,10 +27,6 @@ require('dotenv').config();
 
 //not a route controller just a regular function
 const transactions_tracker = async () => {
-  let transaction_count = 0;
-
-  let transaction_value = 0;
-
   const date_in_millis = new Date().getTime();
 
   // console.log(date_in_millis);
@@ -38,7 +36,12 @@ const transactions_tracker = async () => {
   const dateToGetLower = new Date(date_in_millis - 86400 * 1000);
 
   const transaction_list = await transactions.findAll({
-    attributes: ['amount'],
+    attributes: [
+      [Sequelize.fn('SUM', Sequelize.col('amount')), 'sum'],
+      [Sequelize.fn('count', Sequelize.col('amount')), 'count'],
+    ],
+
+    group: ['transaction_type'],
 
     where: {
       createdAt: {
@@ -46,17 +49,14 @@ const transactions_tracker = async () => {
         [Op.gt]: dateToGetLower,
       },
       transaction_status: 'approved',
+      transaction_type: 'credit',
     },
     raw: true,
   });
 
-  transaction_list.map((transaction) => {
-    transaction_count += 1;
+  console.log(transaction_list);
 
-    transaction_value += transaction.amount;
-  });
-
-  return [transaction_count, transaction_value];
+  return [transaction_list[0].count, transaction_list[0].sum];
 };
 
 const transactionsTrackerRoute = async (req, res) => {
@@ -121,7 +121,7 @@ const addTerminalId = async (req, res) => {
   });
 
   if (!terminal_id_from_db) {
-    throw new Error('something went wrong');
+    throw new Error('terminal id does not exist');
   }
 
   if (!user_to_update) {
@@ -171,6 +171,10 @@ const getStormUsers = async (req, res) => {
 
   const stormId = req.query.stormId;
 
+  const email = req.query.email;
+
+  const tid = req.query.tid;
+
   if (!page) {
     throw new BadRequestError('query param page is missing');
   }
@@ -187,10 +191,49 @@ const getStormUsers = async (req, res) => {
           'storm_id',
           'terminal_id',
           'is_transfer_enabled',
+          'type',
+          'createdAt',
+          'updatedAt',
         ],
 
         where: {
           storm_id: stormId,
+        },
+      })
+    : email
+    ? await user.findOne({
+        attributes: [
+          'business_name',
+          'email',
+          'mobile_number',
+          'storm_id',
+          'terminal_id',
+          'is_transfer_enabled',
+          'type',
+          'createdAt',
+          'updatedAt',
+        ],
+
+        where: {
+          email: email,
+        },
+      })
+    : tid
+    ? await user.findOne({
+        attributes: [
+          'business_name',
+          'email',
+          'mobile_number',
+          'storm_id',
+          'terminal_id',
+          'is_transfer_enabled',
+          'type',
+          'createdAt',
+          'updatedAt',
+        ],
+
+        where: {
+          terminal_id: tid,
         },
       })
     : await user.findAll({
@@ -201,9 +244,13 @@ const getStormUsers = async (req, res) => {
           'storm_id',
           'terminal_id',
           'is_transfer_enabled',
+          'type',
+          'createdAt',
+          'updatedAt',
         ],
         offset: 20 * page,
         limit: 20,
+        order: [['updatedAt', 'DESC']],
       });
 
   Array.isArray(users)
@@ -517,7 +564,7 @@ const createTerminalId = async (req, res) => {
   const createdTerminalId = await terminal_id.create({
     terminal_id: terminalId,
 
-    merchantId: merchantId,
+    merchant_id: merchantId,
   });
 
   if (!createdTerminalId) {
@@ -586,13 +633,86 @@ const getTerminalIds = async (req, res) => {
     order: [['updatedAt', 'DESC']],
   });
 
-  
-
   res.json({
     page: page,
     length: terminalIds.length,
     result: terminalIds,
   });
+};
+
+const changeAgentType = async (req, res) => {
+  const { userId } = req.user;
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
+
+  const { stormId, type } = req.body;
+
+  if (!stormId || !type) {
+    throw new BadRequestError('missing field');
+  }
+
+  if (type != 'agent_1' && type != 'agent_2' && type != 'merchant') {
+    throw new BadRequestError('invalid input for type field');
+  }
+
+  const user_from_db = await user.findOne({
+    where: {
+      storm_id: stormId,
+    },
+  });
+
+  if (!user_from_db) {
+    throw new NotFoundError('user not found!');
+  }
+
+  user_from_db.type = type;
+
+  await user_from_db.save({
+    fields: ['type'],
+    exclude: ['terminalIdTerminalId'],
+  });
+
+  res.send('user type updated');
+};
+
+const changePassword = async (req, res) => {
+  const { userId } = req.user;
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
+
+  const { stormId, newPassword } = req.body;
+
+  if (!stormId || !newPassword) {
+    throw new BadRequestError('missing field');
+  }
+
+  if (newPassword.length < 3) {
+    throw new BadRequestError('password too short');
+  }
+
+  const salt = await bcrypt.genSalt(10);
+
+  const hashed_password = await bcrypt.hash(newPassword, salt);
+
+  const user_from_db = await user.findOne({
+    where: {
+      storm_id: stormId,
+    },
+  });
+
+  if (!user_from_db) {
+    throw new NotFoundError('user not found!');
+  }
+
+  user_from_db.password = hashed_password;
+
+  await user_from_db.save({
+    fields: ['password'],
+  });
+
+  res.send('password updated');
 };
 
 module.exports = {
@@ -605,5 +725,7 @@ module.exports = {
   getStormUsers,
   createTerminalId,
   getDebitTransactions,
-  getTerminalIds
+  getTerminalIds,
+  changeAgentType,
+  changePassword,
 };

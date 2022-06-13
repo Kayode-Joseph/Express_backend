@@ -196,6 +196,9 @@ const updateTransactionAndWalletBalance = async (req, res) => {
   if (!transactionStatus) {
     throw new BadRequestError('transaction status not sepecified');
   }
+  if (transactionStatus != 'approved' && transactionStatus != 'declined') {
+    throw new BadRequestError('transaction status invalid');
+  }
 
   try {
     const netposWebHook = await axios.post(
@@ -333,9 +336,17 @@ const updateTransactionAndWalletBalance = async (req, res) => {
       fields: ['ledger_balance', 'wallet_balance'],
     });
 
+
     created_transaction.settlement_status = 'completed';
 
-    await created_transaction.save({ fields: ['settlement_status'] });
+    const transaction_fee = amount - amount_to_credit;
+
+
+    created_transaction.transaction_fee = -transaction_fee;
+
+    await created_transaction.save({
+      fields: ['settlement_status', 'transaction_fee'],
+    });
 
     res.send('transaction created and wallet updated');
   } else if (userType === 'merchant') {
@@ -358,6 +369,14 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     await owner_of_storm_wallet.save({
       fields: ['ledger_balance'],
     });
+
+     const transaction_fee = amount - amount_to_credit;
+
+     created_transaction.transaction_fee = -transaction_fee;
+
+     await created_transaction.save({
+       fields: ['transaction_fee'],
+     });
 
     const trans_cache = await merchant_transaction_cache.create({
       rrn: RRN,
@@ -424,24 +443,21 @@ const getTransactions = async (req, res) => {
 
   let dateValidityChecker = false;
 
-      let dateLowerBound_in_milliseconds= null
+  let dateLowerBound_in_milliseconds = null;
 
-      let dateUpperBound_in_milliseconds=null
+  let dateUpperBound_in_milliseconds = null;
 
   if (dateLowerBound && dateLowerBound) {
     dateLowerBound_in_milliseconds = new Date(
-      dateLowerBound + ' 00:00'
+      dateLowerBound + ' 01:00'
     ).getTime();
 
-     dateUpperBound_in_milliseconds = new Date(
-      dateUpperBound + ' 00:00'
-    ).getTime();
+    dateUpperBound_in_milliseconds =
+      new Date(dateUpperBound + ' 01:00').getTime() + 86400 * 1000;
 
     function dateIsValid(date) {
       return new Date(date) instanceof Date && !isNaN(date);
     }
-
-
 
     if (
       !dateIsValid(dateLowerBound_in_milliseconds) ||
