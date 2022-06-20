@@ -171,6 +171,18 @@ module.exports = (sequelize, DataTypes) => {
       response_message: {
         type: DataTypes.STRING,
       },
+      bill_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+      product_id: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      bill_name:{
+      type: DataTypes.STRING,
+      allowNull: true,
+    }
     },
 
     {

@@ -199,7 +199,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
   if (transactionStatus != 'approved' && transactionStatus != 'declined') {
     throw new BadRequestError('transaction status invalid');
   }
-
+if(userType==='agent_1'||userType==='agent_2'){
   try {
     const netposWebHook = await axios.post(
       process.env.WEBHOOKURL,
@@ -220,6 +220,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
   } catch (e) {
     console.log(JSON.stringify(e));
   }
+}
 
   const user_type = await user.findOne({
     attributes: ['type'],
