@@ -4,7 +4,7 @@ const {
   BadRequestError,
 } = require('../errors');
 
-const { Op } = require('sequelize');
+const { Op, where } = require('sequelize');
 
 const Sequelize = require('sequelize');
 
@@ -56,7 +56,9 @@ const transactions_tracker = async () => {
 
   console.log(transaction_list);
 
-  return [transaction_list[0].count, transaction_list[0].sum];
+  return transaction_list.length > 1
+    ? [transaction_list[0].count, transaction_list[0].sum]
+    : [null, null];
 };
 
 const transactionsTrackerRoute = async (req, res) => {
@@ -274,70 +276,158 @@ const getTransactions = async (req, res) => {
 
   const tid = req.query.tid;
 
-  if (!page) {
-    throw new BadRequestError('query param page is missing');
+  const reference = req.query.reference;
+
+  const dateLowerBound = req.query.dateLowerBound;
+
+  const dateUpperBound = req.query.dateUpperBound;
+
+  if (dateLowerBound && !dateUpperBound) {
+    throw new BadRequestError('date lower bound requires date upper bound');
   }
-  if (isNaN(page)) {
-    throw new BadRequestError('query param page must be a number');
+
+  if (!dateLowerBound && dateUpperBound) {
+    throw new BadRequestError('date upper bound requires date lower bound');
+  }
+
+  console.log(reference)
+
+  let dateValidityChecker = false;
+
+  let dateLowerBound_in_milliseconds = null;
+
+  let dateUpperBound_in_milliseconds = null;
+
+  if (dateLowerBound && dateLowerBound) {
+    dateLowerBound_in_milliseconds = new Date(
+      dateLowerBound + ' 01:00'
+    ).getTime();
+
+    dateUpperBound_in_milliseconds =
+      new Date(dateUpperBound + ' 01:00').getTime() + 86400 * 1000;
+
+    function dateIsValid(date) {
+      return new Date(date) instanceof Date && !isNaN(date);
+    }
+
+    if (
+      !dateIsValid(dateLowerBound_in_milliseconds) ||
+      !dateIsValid(dateUpperBound_in_milliseconds)
+    ) {
+      throw new BadRequestError('invalid date fromat');
+    }
+
+    dateValidityChecker = true;
+  }
+
+  let queryObject = {
+    attributes: [
+      'storm_id',
+      'terminal_id',
+      'amount',
+      'rrn',
+      'reference',
+      'user_type',
+      'createdAt',
+      'updatedAt',
+      'reference',
+      'amount',
+      'transaction_fee',
+      'description',
+      'destination',
+      'storm_id',
+      'transaction_status',
+      'settlement_status',
+      'transaction_type',
+    ],
+
+    offset: 20 * page,
+    limit: 20,
+
+    where: {
+      rrn: rrn,
+      reference: reference,
+      terminal_id: tid,
+      storm_id: stormId,
+      updatedAt: {
+        [Op.lt]: dateUpperBound_in_milliseconds,
+        [Op.gt]: dateLowerBound_in_milliseconds,
+      },
+    },
+
+    order: [['updatedAt', 'DESC']],
+  };
+
+  if (page) {
+    if (isNaN(page)) {
+      throw new BadRequestError('query param page must be a number');
+    }
+  }
+
+  if (rrn || reference) {
+    delete queryObject.offset;
+
+    delete queryObject.limit;
+
+    delete queryObject.where.terminal_id;
+
+    delete queryObject.where.storm_id;
+
+    delete queryObject.where.updatedAt;
+    if (rrn) {
+      delete queryObject.where.reference;
+    }
+    if (reference) {
+      delete queryObject.where.rrn;
+    }
+  }
+
+  if (!page) {
+    delete queryObject.offset;
+
+    delete queryObject.limit;
+  }
+
+  if (stormId) {
+    delete queryObject.where.terminal_id;
+
+    delete queryObject.where.rrn;
+
+    delete queryObject.where.reference;
+  }
+
+  if (tid) {
+    delete queryObject.where.storm_id;
+
+     delete queryObject.where.rrn;
+
+     delete queryObject.where.reference;
+  }
+
+  if (!stormId && !tid) {
+    delete queryObject.where.terminal_id;
+    delete queryObject.where.storm_id;
+  }
+  if (dateValidityChecker == false) {
+    delete queryObject.where.updatedAt;
+
+    
+  }
+
+  if(dateValidityChecker==true){
+
+      delete queryObject.where.rrn;
+
+      delete queryObject.where.reference;
   }
 
   const transaction_list = rrn
-    ? await transactions.findOne({
-        attributes: [
-          'storm_id',
-          'terminal_id',
-          'rrn',
-          'amount',
-          'createdAt',
-          'settlement_status',
-          'transaction_status',
-        ],
-
-        where: {
-          rrn: rrn,
-        },
-      })
+    ? await transactions.findOne(queryObject)
+    : reference
+    ? await transactions.findOne(queryObject)
     : stormId
-    ? await transactions.findAll({
-        attributes: [
-          'storm_id',
-          'terminal_id',
-          'rrn',
-          'amount',
-          'createdAt',
-          'settlement_status',
-          'transaction_status',
-        ],
-
-        offset: 20 * page,
-        limit: 20,
-
-        where: {
-          storm_id: stormId,
-        },
-        order: [['updatedAt', 'DESC']],
-      })
-    : await transactions.findAll({
-        attributes: [
-          'storm_id',
-          'terminal_id',
-          'rrn',
-          'amount',
-          'createdAt',
-          'settlement_status',
-          'transaction_status',
-        ],
-
-        offset: 20 * page,
-        limit: 20,
-
-        where: tid
-          ? {
-              terminal_id: tid,
-            }
-          : undefined,
-        order: [['updatedAt', 'DESC']],
-      });
+    ? await transactions.findAll(queryObject)
+    : await transactions.findAll(queryObject);
 
   Array.isArray(transaction_list)
     ? res.json({
@@ -347,7 +437,8 @@ const getTransactions = async (req, res) => {
       })
     : res.json({
         page: page,
-        length: transaction_list ? 1 : (0)[transaction_list],
+        length: 1,
+        result: [transaction_list],
       });
 };
 
