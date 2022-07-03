@@ -4,7 +4,7 @@ module.exports = {
   async up(queryInterface, DataTypes) {
     await queryInterface.addColumn('transactions', 'bill_id', {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
     });
 
     await queryInterface.addColumn('transactions', 'product_id', {

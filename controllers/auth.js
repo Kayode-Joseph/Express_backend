@@ -155,7 +155,7 @@ const register = async (req, res) => {
     });
   } catch (e) {
     console.log(e);
-    throw new BadRequestError('something went wrong');
+    throw new Error('something went wrong');
   }
 
   res.status(201).json({ user: new_user, token: token });

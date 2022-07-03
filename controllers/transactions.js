@@ -199,38 +199,56 @@ const updateTransactionAndWalletBalance = async (req, res) => {
   if (transactionStatus != 'approved' && transactionStatus != 'declined') {
     throw new BadRequestError('transaction status invalid');
   }
-if(userType==='agent_1'||userType==='agent_2'){
-  try {
-    const netposWebHook = await axios.post(
-      process.env.WEBHOOKURL,
-      {
-        transactionResponse: {
-          ...req.body,
-          rrn: RRN,
-          responseMessage: transactionStatus,
-        },
-      },
-      {
-        timeout: 30000,
-        headers: {
-          'content-type': 'application/json',
-        },
-      }
-    );
-  } catch (e) {
-    console.log(JSON.stringify(e));
-  }
-}
 
-  const user_type = await user.findOne({
-    attributes: ['type'],
+  const checkIfTransactionExists = await transactions.findOne({
+    attributes: ['rrn'],
+    where: {
+      rrn: RRN,
+    },
+  });
+
+  if (checkIfTransactionExists) {
+    res.status(409).send('transaction with rrn ' + RRN + ' already exists');
+
+    return;
+  }
+
+  const userFromDB = await user.findOne({
+    attributes: ['type', 'aggregator_id'],
     where: {
       storm_id: userId,
     },
   });
 
-  if (user_type.dataValues.type != userType) {
+  if (!userFromDB) {
+    throw new NotFoundError('User not found');
+  }
+
+  if (userFromDB.dataValues.type != userType) {
     throw new BadRequestError('userType mismatch');
+  }
+
+  if (userType === 'agent_1' || userType === 'agent_2') {
+    try {
+      const netposWebHook = await axios.post(
+        process.env.WEBHOOKURL,
+        {
+          transactionResponse: {
+            ...req.body,
+            rrn: RRN,
+            responseMessage: transactionStatus,
+          },
+        },
+        {
+          timeout: 30000,
+          headers: {
+            'content-type': 'application/json',
+          },
+        }
+      );
+    } catch (e) {
+      console.log(JSON.stringify(e));
+    }
   }
 
   //logging the transaction
@@ -269,6 +287,7 @@ if(userType==='agent_1'||userType==='agent_2'){
     transaction_status: transactionStatus,
     routing_channel: routingChannel,
     transaction_type: 'credit',
+    aggregator_id: userFromDB.dataValues.aggregator_id,
   });
 
   if (transactionStatus === 'declined') {
@@ -337,11 +356,9 @@ if(userType==='agent_1'||userType==='agent_2'){
       fields: ['ledger_balance', 'wallet_balance'],
     });
 
-
     created_transaction.settlement_status = 'completed';
 
     const transaction_fee = amount - amount_to_credit;
-
 
     created_transaction.transaction_fee = -transaction_fee;
 
@@ -371,13 +388,13 @@ if(userType==='agent_1'||userType==='agent_2'){
       fields: ['ledger_balance'],
     });
 
-     const transaction_fee = amount - amount_to_credit;
+    const transaction_fee = amount - amount_to_credit;
 
-     created_transaction.transaction_fee = -transaction_fee;
+    created_transaction.transaction_fee = -transaction_fee;
 
-     await created_transaction.save({
-       fields: ['transaction_fee'],
-     });
+    await created_transaction.save({
+      fields: ['transaction_fee'],
+    });
 
     const trans_cache = await merchant_transaction_cache.create({
       rrn: RRN,

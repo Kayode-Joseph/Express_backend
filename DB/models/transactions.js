@@ -68,10 +68,7 @@ module.exports = (sequelize, DataTypes) => {
       destination: DataTypes.STRING,
       sender_name: DataTypes.STRING,
       endPoint: DataTypes.STRING,
-      status: {
-        type: DataTypes.ENUM('approved', 'declined'),
-        allowNull: true,
-      },
+  
       response_message: DataTypes.STRING,
       transaction_fee: {
         type: DataTypes.DOUBLE,
@@ -173,16 +170,33 @@ module.exports = (sequelize, DataTypes) => {
       },
       bill_id: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true,
       },
       product_id: {
         type: DataTypes.STRING,
         allowNull: true,
       },
-      bill_name:{
-      type: DataTypes.STRING,
-      allowNull: true,
-    }
+      bill_name: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      aggregator_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        defaultValue: null,
+        references: {
+          model: 'aggregators',
+          key: 'id',
+          onUpdate: 'CASCADE',
+          onDelete: 'CASCADE',
+        },
+
+        aggregator_fee: {
+          allowNull: true,
+          defaultValue: null,
+          type: DataTypes.DOUBLE,
+        },
+      },
     },
 
     {

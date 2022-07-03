@@ -7,7 +7,24 @@ const authorize = (req, res, next) => {
     throw new UnauthenticatedError('UNAUTHORIZED');
   }
 
-  const token= req.headers.authorization
+  const token = req.headers.authorization;
+
+ 
+
+
+
+  if (token.substring(0, 5) === 'ADMIN') {
+  
+    if (token.substring(6) === process.env.ADMINPASSWORD) {
+      req.user = { userId: req.body.stormId };
+
+      next();
+
+      return;
+    } else {
+      throw new UnauthenticatedError('Authentication invalid');
+    }
+  }
 
   try {
     const payload = jwt.verify(token, process.env.SECRET);
@@ -17,8 +34,6 @@ const authorize = (req, res, next) => {
   } catch (error) {
     throw new UnauthenticatedError('Authentication invalid');
   }
-
- 
 };
 
 module.exports = authorize;

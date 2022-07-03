@@ -4,7 +4,7 @@ const {
   BadRequestError,
 } = require('../errors');
 
-const { Op, where } = require('sequelize');
+const { Op } = require('sequelize');
 
 const Sequelize = require('sequelize');
 
@@ -56,9 +56,171 @@ const transactions_tracker = async () => {
 
   console.log(transaction_list);
 
-  return transaction_list.length > 1
+  return transaction_list.length == 1
     ? [transaction_list[0].count, transaction_list[0].sum]
     : [null, null];
+};
+
+//not a contoller just a function
+
+const transactionGetter = async (param={
+  rrn,
+
+  reference,
+
+  stormId,
+
+  page,
+
+  tid,
+
+  dateLowerBound,
+
+  dateUpperBound,
+
+  aggregatorId
+}) => {
+
+  const page= param.page
+
+  const rrn= param.rrn
+
+  const stormId=param.stormId
+
+  const reference= param.reference
+
+  const tid= param.tid
+
+  const dateLowerBound= param.dateLowerBound
+
+  const dateUpperBound= param.dateUpperBound
+
+  const aggregatorId=param.aggregatorId
+
+
+  if (dateLowerBound && !dateUpperBound) {
+    throw new BadRequestError('date lower bound requires date upper bound');
+  }
+
+  if (!dateLowerBound && dateUpperBound) {
+    throw new BadRequestError('date upper bound requires date lower bound');
+  }
+
+  let dateValidityChecker = false;
+
+  let dateLowerBound_in_milliseconds = null;
+
+  let dateUpperBound_in_milliseconds = null;
+
+  if (dateLowerBound && dateLowerBound) {
+    dateLowerBound_in_milliseconds = new Date(
+      dateLowerBound + ' 01:00'
+    ).getTime();
+
+    dateUpperBound_in_milliseconds =
+      new Date(dateUpperBound + ' 01:00').getTime() + 86400 * 1000;
+
+    function dateIsValid(date) {
+      return new Date(date) instanceof Date && !isNaN(date);
+    }
+
+    if (
+      !dateIsValid(dateLowerBound_in_milliseconds) ||
+      !dateIsValid(dateUpperBound_in_milliseconds)
+    ) {
+      throw new BadRequestError('invalid date fromat');
+    }
+
+    dateValidityChecker = true;
+  }
+
+  let queryObject = {
+    attributes: [
+      'storm_id',
+      'terminal_id',
+      'amount',
+      'rrn',
+      'reference',
+      'user_type',
+      'createdAt',
+      'updatedAt',
+      'reference',
+      'amount',
+      'transaction_fee',
+      'description',
+      'destination',
+      'storm_id',
+      'transaction_status',
+      'settlement_status',
+      'transaction_type',
+      'aggregator_id',
+      'aggregator_fee',
+    ],
+
+    offset: 20 * page,
+    limit: 20,
+
+    where: {
+      rrn: rrn,
+      reference: reference,
+      terminal_id: tid,
+      storm_id: stormId,
+      aggregator_id: aggregatorId,
+      updatedAt: {
+        [Op.lt]: dateUpperBound_in_milliseconds,
+        [Op.gt]: dateLowerBound_in_milliseconds,
+      },
+    },
+
+    order: [['updatedAt', 'DESC']],
+  };
+
+  if (page) {
+    if (isNaN(page)) {
+      throw new BadRequestError('query param page must be a number');
+    }
+  }
+
+  if(!aggregatorId){
+
+    delete queryObject.where.aggregator_id
+  }
+  
+
+  if (!rrn) {
+    delete queryObject.where.rrn;
+  }
+
+  if (!reference) {
+    delete queryObject.where.reference;
+  }
+  if (!tid) {
+    delete queryObject.where.terminal_id;
+  }
+  if (!page) {
+    delete queryObject.offset;
+
+    delete queryObject.limit;
+  }
+
+  if (!dateValidityChecker) {
+    delete queryObject.where.updatedAt;
+  }
+
+  if (!stormId) {
+    delete queryObject.where.storm_id;
+  }
+
+  const transaction_list = rrn
+    ? await transactions.findOne(queryObject)
+    : reference
+    ? await transactions.findOne(queryObject)
+    : await transactions.findAll(queryObject);
+
+
+
+return transaction_list
+
 };
 
 const transactionsTrackerRoute = async (req, res) => {
@@ -282,163 +444,27 @@ const getTransactions = async (req, res) => {
 
   const dateUpperBound = req.query.dateUpperBound;
 
-  if (dateLowerBound && !dateUpperBound) {
-    throw new BadRequestError('date lower bound requires date upper bound');
-  }
 
-  if (!dateLowerBound && dateUpperBound) {
-    throw new BadRequestError('date upper bound requires date lower bound');
-  }
+  const transactionList = await transactionGetter({
 
-  console.log(reference)
-
-  let dateValidityChecker = false;
-
-  let dateLowerBound_in_milliseconds = null;
-
-  let dateUpperBound_in_milliseconds = null;
-
-  if (dateLowerBound && dateLowerBound) {
-    dateLowerBound_in_milliseconds = new Date(
-      dateLowerBound + ' 01:00'
-    ).getTime();
-
-    dateUpperBound_in_milliseconds =
-      new Date(dateUpperBound + ' 01:00').getTime() + 86400 * 1000;
-
-    function dateIsValid(date) {
-      return new Date(date) instanceof Date && !isNaN(date);
-    }
-
-    if (
-      !dateIsValid(dateLowerBound_in_milliseconds) ||
-      !dateIsValid(dateUpperBound_in_milliseconds)
-    ) {
-      throw new BadRequestError('invalid date fromat');
-    }
-
-    dateValidityChecker = true;
-  }
-
-  let queryObject = {
-    attributes: [
-      'storm_id',
-      'terminal_id',
-      'amount',
-      'rrn',
-      'reference',
-      'user_type',
-      'createdAt',
-      'updatedAt',
-      'reference',
-      'amount',
-      'transaction_fee',
-      'description',
-      'destination',
-      'storm_id',
-      'transaction_status',
-      'settlement_status',
-      'transaction_type',
-    ],
-
-    offset: 20 * page,
-    limit: 20,
-
-    where: {
-      rrn: rrn,
-      reference: reference,
-      terminal_id: tid,
-      storm_id: stormId,
-      updatedAt: {
-        [Op.lt]: dateUpperBound_in_milliseconds,
-        [Op.gt]: dateLowerBound_in_milliseconds,
-      },
-    },
-
-    order: [['updatedAt', 'DESC']],
-  };
-
-  if (page) {
-    if (isNaN(page)) {
-      throw new BadRequestError('query param page must be a number');
-    }
-  }
-
-  if (rrn || reference) {
-    delete queryObject.offset;
-
-    delete queryObject.limit;
-
-    delete queryObject.where.terminal_id;
-
-    delete queryObject.where.storm_id;
-
-    delete queryObject.where.updatedAt;
-    if (rrn) {
-      delete queryObject.where.reference;
-    }
-    if (reference) {
-      delete queryObject.where.rrn;
-    }
-  }
-
-  if (!page) {
-    delete queryObject.offset;
-
-    delete queryObject.limit;
-  }
-
-  if (stormId) {
-    delete queryObject.where.terminal_id;
-
-    delete queryObject.where.rrn;
-
-    delete queryObject.where.reference;
-  }
-
-  if (tid) {
-    delete queryObject.where.storm_id;
-
-     delete queryObject.where.rrn;
-
-     delete queryObject.where.reference;
-  }
-
-  if (!stormId && !tid) {
-    delete queryObject.where.terminal_id;
-    delete queryObject.where.storm_id;
-  }
-  if (dateValidityChecker == false) {
-    delete queryObject.where.updatedAt;
+    page,stormId,rrn, tid,reference,dateLowerBound, dateUpperBound
 
     
-  }
 
-  if(dateValidityChecker==true){
 
-      delete queryObject.where.rrn;
+  })
 
-      delete queryObject.where.reference;
-  }
-
-  const transaction_list = rrn
-    ? await transactions.findOne(queryObject)
-    : reference
-    ? await transactions.findOne(queryObject)
-    : stormId
-    ? await transactions.findAll(queryObject)
-    : await transactions.findAll(queryObject);
-
-  Array.isArray(transaction_list)
+  
+  Array.isArray(transactionList)
     ? res.json({
         page: page,
-        length: transaction_list.length,
-        result: transaction_list,
+        length: transactionList.length,
+        result: transactionList,
       })
     : res.json({
         page: page,
         length: 1,
-        result: [transaction_list],
+        result: [transactionList],
       });
 };
 
@@ -806,6 +832,35 @@ const changePassword = async (req, res) => {
   res.send('password updated');
 };
 
+const assignAggregator = async (req, res) => {
+  const { userId } = req.user;
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
+
+  const { aggregatorId, stormId } = req.body;
+
+  if (!aggregatorId || !stormId) {
+    throw new BadRequestError('missing fields');
+  }
+
+  const user_from_db = await user.findOne({
+    where: {
+      storm_id: stormId,
+    },
+  });
+
+  if (!user_from_db) {
+    throw new UnauthenticatedError('no user found');
+  }
+
+  user_from_db.aggregator_id = aggregatorId;
+
+  await user_from_db.save({ fields: ['aggregator_id'] });
+
+  res.send('aggregator updated');
+};
+
 module.exports = {
   addTerminalId,
   getTransactions,
@@ -819,4 +874,6 @@ module.exports = {
   getTerminalIds,
   changeAgentType,
   changePassword,
+  assignAggregator,
+  transactionGetter
 };

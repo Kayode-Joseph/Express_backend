@@ -8,13 +8,7 @@ const cluster = require('cluster');
 
 const os = require('os');
 
-
 const numCpu = os.cpus().length;
-
-
-
-
-
 
 const {
   merchant_transaction_cache,
@@ -45,6 +39,8 @@ const adminRouter = require('./router/admin');
 const bankRouter = require('./router/banks');
 
 const billsRouter = require('./router/bills');
+
+const aggregatorRouter = require('./router/aggregator');
 
 const notFoundMiddleware = require('./middleware/not-found');
 const errorHandlerMiddleware = require('./middleware/error-handler');
@@ -89,9 +85,15 @@ app.use('/api/v1/banks', bankRouter);
 
 app.use('/api/v1/admin', adminRouter);
 
+
+
+
 app.use(authorize);
 
 app.use('/api/v1/auth', authRouter);
+
+
+app.use('/api/v1/aggregator', aggregatorRouter)
 
 app.use(jwt_authorize);
 
@@ -104,13 +106,11 @@ app.use('/api/v1/wallet', walletRouter);
 app.use('/api/v1/users', userRouter);
 
 app.get('/', (req, res) => {
-  res.send('jobs api');
+  res.send('storm api');
 });
 
 app.use(notFoundMiddleware);
 app.use(errorHandlerMiddleware);
-
-
 
 if (cluster.isMaster) {
   for (let i = 0; i < numCpu; i++) {
@@ -127,8 +127,6 @@ if (cluster.isMaster) {
   app.listen(process.env.PORT || 3000, async () => {
     try {
       await sequelize.authenticate();
-
-     
 
       console.log(
         'sever started on port ' + process.env.PORT + 'thread: ' + process.pid
@@ -147,8 +145,6 @@ if (cluster.isMaster) {
         const dateToGetLower = new Date(date_in_millis - 86400 * 1000);
 
         try {
-
-          
           const transaction_list = await merchant_transaction_cache.findAll({
             where: {
               createdAt: {
@@ -197,6 +193,3 @@ if (cluster.isMaster) {
     }
   });
 }
-
- 
-
