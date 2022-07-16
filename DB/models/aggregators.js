@@ -2,6 +2,7 @@
 const {
   Model
 } = require('sequelize');
+const aggregatorWalletTransactions = require('./aggregatorWalletTransactions');
 module.exports = (sequelize, DataTypes) => {
   class aggregators extends Model {
     /**
@@ -9,12 +10,16 @@ module.exports = (sequelize, DataTypes) => {
      * This method is not a part of Sequelize lifecycle.
      * The `models/index` file will call this method automatically.
      */
-    static associate({aggregator_wallet}) {
+    static associate({aggregator_wallet, aggregatorWalletTransactions}) {
          this.hasOne(aggregator_wallet, {
            foreignKey: 'aggregator_id',
           
            onUpdate: 'NO ACTION',
            onDelete: 'CASCADE',
+         });
+
+         this.hasMany(aggregatorWalletTransactions, {
+           foreignKey: 'aggregator_id',
          });
     }
   }

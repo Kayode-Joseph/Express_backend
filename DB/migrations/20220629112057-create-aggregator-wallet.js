@@ -8,16 +8,16 @@ module.exports = {
         unique: true,
         type: DataTypes.INTEGER,
       },
-      aggregator_id: {
-        type: DataTypes.UUID,
-        allowNull: false,
-        primaryKey: true,
-        references: {
-          model: 'aggregators',
-          key: 'id',
-          onUpdate: 'CASCADE',
-          onDelete: 'CASCADE',
-        },
+        aggregator_id: {
+          type: DataTypes.UUID,
+          allowNull: false,
+          primaryKey: true,
+          references: {
+            model: 'aggregators',
+            key: 'id',
+            onUpdate: 'CASCADE',
+            onDelete: 'CASCADE',
+          },
       },
       wallet_balance: {
         type: DataTypes.DOUBLE,

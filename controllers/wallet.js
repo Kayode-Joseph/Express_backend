@@ -6,7 +6,6 @@ const {
 
 const axios = require('axios').default;
 
-
 const bcrypt = require('bcrypt');
 
 const {
@@ -21,6 +20,58 @@ require('dotenv').config();
 
 //not a route
 
+const eTranzactCaller = async (
+  bankCode,
+  senderName,
+  recieverName,
+  accountNumber,
+  amount,
+  description,
+  referenceRandom,
+  debitTransaction,
+  next
+) => {
+  let eTranzactResponse = null;
+  try {
+    eTranzactResponse = await axios.post(
+      process.env.FTURL,
+      {
+        action: 'FT',
+        terminalId: process.env.TID,
+        transaction: {
+          pin: process.env.AES,
+          bankCode: bankCode,
+          senderName: `${senderName.substring(0, 8)}||${recieverName.substring(
+            0,
+            8
+          )}|${accountNumber} `,
+          amount: amount,
+          description: description,
+          destination: accountNumber,
+          reference: referenceRandom,
+          endPoint: 'A',
+        },
+      },
+      { timeout: 32000 }
+    );
+  } catch (error) {
+    console.log(error);
+    debitTransaction.response_code = 500;
+
+    debitTransaction.response_message = error.message;
+
+    await debitTransaction.save({
+      fields: ['response_code', 'response_message'],
+    });
+
+    next(error);
+
+    return null;
+  }
+
+  return eTranzactResponse;
+};
+
 const paymentValidator = async (
   amount,
   user,
@@ -29,12 +80,12 @@ const paymentValidator = async (
   transaction_fees,
   BadRequestError,
   NotFoundError,
-  pin
+  pin,
+  isAggregator,
+  walletQueryObject
 ) => {
   const stormWallet = await storm_wallet.findOne({
-    where: {
-      storm_id: stormId,
-    },
+    where: walletQueryObject,
   });
 
   if (!stormWallet) {
@@ -49,19 +100,24 @@ const paymentValidator = async (
     throw new UnauthenticatedError('wrong pin!');
   }
 
-  const user_from_database = await user.findOne({
-    attributes: ['type', 'terminal_id', 'is_transfer_enabled'],
+  let user_from_database = null;
 
-    where: {
-      storm_id: stormId,
-    },
-  });
+  if (isAggregator === false) {
+    user_from_database = await user.findOne({
+      attributes: ['type', 'terminal_id', 'is_transfer_enabled'],
 
-  if (!user_from_database) {
-    throw new NotFoundError('something went wrong');
+      where: {
+        storm_id: stormId,
+      },
+    });
+
+    if (!user_from_database) {
+      throw new NotFoundError('something went wrong');
+    }
   }
-
-  const userType = user_from_database.dataValues.type;
+  const userType = isAggregator
+    ? 'aggregator'
+    : user_from_database.dataValues.type;
 
   const transactionFee = await transaction_fees.findOne({
     attributes: ['transfer_out_fee'],
@@ -157,7 +213,7 @@ const debitWallet = async (req, res, next) => {
     stormId,
 
     amount,
-    pin
+    pin,
   } = req.body;
 
   if (
@@ -197,7 +253,7 @@ const debitWallet = async (req, res, next) => {
     transactionFee,
     check_if_available_balance_is_sufficient_for_transaction,
     user_from_database,
-    userType
+    userType,
   } = await paymentValidator(
     amount,
     user,
@@ -205,8 +261,12 @@ const debitWallet = async (req, res, next) => {
     stormId,
     transaction_fees,
     BadRequestError,
-    NotFoundError, 
-    pin
+    NotFoundError,
+    pin,
+    false,
+    (walletQueryObject = {
+      storm_id: stormId,
+    })
   );
 
   if (user_from_database.dataValues.is_transfer_enabled != 'true') {
@@ -248,45 +308,19 @@ const debitWallet = async (req, res, next) => {
     transaction_type: 'debit',
   });
 
-  let eTranzactResponse = null;
-  try {
-    eTranzactResponse = await axios.post(
-      process.env.FTURL,
-      {
-        action: 'FT',
-        terminalId: process.env.TID,
-        transaction: {
-          pin: process.env.AES,
-          bankCode: bankCode,
-          senderName: `${senderName.substring(0, 8)}||${recieverName.substring(
-            0,
-            8
-          )}|${accountNumber} `,
-          amount: amount,
-          description: description,
-          destination: accountNumber,
-          reference: referenceRandom,
-          endPoint: 'A',
-        },
-      },
-      { timeout: 32000 }
-    );
-  } catch (error) {
-
-    console.log(error)
-    debitTransaction.response_code = 500;
-
-    debitTransaction.response_message = error.message;
-
-    await debitTransaction.save({
-      fields: ['response_code', 'response_message'],
-    });
-
-    next(error);
-
-    return;
-  }
   //res.send(eTranzactResponse.data);
+
+  const eTranzactResponse = await eTranzactCaller(
+    bankCode,
+    senderName,
+    recieverName,
+    accountNumber,
+    amount,
+    description,
+    referenceRandom,
+    debitTransaction,
+    next
+  );
 
   if (!eTranzactResponse) {
     throw new Error('something went wrong');
@@ -347,11 +381,7 @@ const debitWallet = async (req, res, next) => {
   debitTransaction.response_message = eTranzactResponse.data.message;
 
   await debitTransaction.save({
-    fields: [
-      'reference_from_etranzact',
-      'response_code',
-      'response_message'
-    ],
+    fields: ['reference_from_etranzact', 'response_code', 'response_message'],
   });
 
   res.json({
@@ -405,7 +435,6 @@ const verifyName = async (req, res, next) => {
     return;
   }
 
-  console.log(eTranzactResponse.data);
   res.status(200).json({
     code: eTranzactResponse.data.error,
     message: eTranzactResponse.data.message,
@@ -417,4 +446,6 @@ module.exports = {
   debitWallet,
   verifyName,
   paymentValidator,
+
+  eTranzactCaller,
 };

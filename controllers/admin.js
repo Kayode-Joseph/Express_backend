@@ -17,6 +17,8 @@ const {
   superadmin,
   admin,
   terminal_id,
+  aggregators,
+  aggregator_wallet,
 } = require('../DB/models');
 
 const bcrypt = require('bcrypt');
@@ -63,40 +65,40 @@ const transactions_tracker = async () => {
 
 //not a contoller just a function
 
-const transactionGetter = async (param={
-  rrn,
+const transactionGetter = async (
+  param = {
+    rrn,
 
-  reference,
+    reference,
 
-  stormId,
+    stormId,
 
-  page,
+    page,
 
-  tid,
+    tid,
 
-  dateLowerBound,
+    dateLowerBound,
 
-  dateUpperBound,
+    dateUpperBound,
 
-  aggregatorId
-}) => {
+    aggregatorId,
+  }
+) => {
+  const page = param.page;
 
-  const page= param.page
+  const rrn = param.rrn;
 
-  const rrn= param.rrn
+  const stormId = param.stormId;
 
-  const stormId=param.stormId
+  const reference = param.reference;
 
-  const reference= param.reference
+  const tid = param.tid;
 
-  const tid= param.tid
+  const dateLowerBound = param.dateLowerBound;
 
-  const dateLowerBound= param.dateLowerBound
+  const dateUpperBound = param.dateUpperBound;
 
-  const dateUpperBound= param.dateUpperBound
-
-  const aggregatorId=param.aggregatorId
-
+  const aggregatorId = param.aggregatorId;
 
   if (dateLowerBound && !dateUpperBound) {
     throw new BadRequestError('date lower bound requires date upper bound');
@@ -181,11 +183,9 @@ const transactionGetter = async (param={
     }
   }
 
-  if(!aggregatorId){
-
-    delete queryObject.where.aggregator_id
+  if (!aggregatorId) {
+    delete queryObject.where.aggregator_id;
   }
-  
 
   if (!rrn) {
     delete queryObject.where.rrn;
@@ -217,10 +217,7 @@ const transactionGetter = async (param={
     ? await transactions.findOne(queryObject)
     : await transactions.findAll(queryObject);
 
-
-
-return transaction_list
-
+  return transaction_list;
 };
 
 const transactionsTrackerRoute = async (req, res) => {
@@ -261,6 +258,28 @@ const addTerminalId = async (req, res) => {
     }
   }
 
+  const check_if_terminal_id_is_assigned = await user.findOne({
+    attributes: ['terminal_id'],
+
+    where: {
+      terminal_id: terminalId,
+    },
+  });
+
+  if (check_if_terminal_id_is_assigned) {
+    throw new BadRequestError('terminal id already assigned');
+  }
+
+  const terminal_id_from_db = await terminal_id.findOne({
+    where: {
+      terminal_id: terminalId,
+    },
+  });
+
+  if (!terminal_id_from_db) {
+    throw new Error('terminal id does not exist');
+  }
+
   const user_to_update = await user.findOne({
     attributes: [
       'storm_id',
@@ -277,16 +296,6 @@ const addTerminalId = async (req, res) => {
       storm_id: stormId,
     },
   });
-
-  const terminal_id_from_db = await terminal_id.findOne({
-    where: {
-      terminal_id: terminalId,
-    },
-  });
-
-  if (!terminal_id_from_db) {
-    throw new Error('terminal id does not exist');
-  }
 
   if (!user_to_update) {
     throw new NotFoundError('cannot find user');
@@ -356,6 +365,7 @@ const getStormUsers = async (req, res) => {
           'terminal_id',
           'is_transfer_enabled',
           'type',
+          'aggregator_id',
           'createdAt',
           'updatedAt',
         ],
@@ -373,6 +383,7 @@ const getStormUsers = async (req, res) => {
           'storm_id',
           'terminal_id',
           'is_transfer_enabled',
+          'aggregator_id',
           'type',
           'createdAt',
           'updatedAt',
@@ -391,6 +402,7 @@ const getStormUsers = async (req, res) => {
           'storm_id',
           'terminal_id',
           'is_transfer_enabled',
+          'aggregator_id',
           'type',
           'createdAt',
           'updatedAt',
@@ -408,6 +420,7 @@ const getStormUsers = async (req, res) => {
           'storm_id',
           'terminal_id',
           'is_transfer_enabled',
+          'aggregator_id',
           'type',
           'createdAt',
           'updatedAt',
@@ -444,17 +457,16 @@ const getTransactions = async (req, res) => {
 
   const dateUpperBound = req.query.dateUpperBound;
 
-
   const transactionList = await transactionGetter({
+    page,
+    stormId,
+    rrn,
+    tid,
+    reference,
+    dateLowerBound,
+    dateUpperBound,
+  });
 
-    page,stormId,rrn, tid,reference,dateLowerBound, dateUpperBound
-
-    
-
-
-  })
-
-  
   Array.isArray(transactionList)
     ? res.json({
         page: page,
@@ -861,6 +873,83 @@ const assignAggregator = async (req, res) => {
   res.send('aggregator updated');
 };
 
+const getAggregators = async (req, res) => {
+  const { userId } = req.user;
+
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
+
+  const page = req.query.page;
+
+  const id = req.query.id;
+
+  const email = req.query.email;
+
+ 
+
+  if (page) {
+    if (isNaN(page)) {
+      throw new BadRequestError('query param page must be a number');
+    }
+  }
+
+  const queryObject = {
+    attributes: [
+      'id',
+      'email',
+      'name',
+      'phoneNumber',
+      'createdAt',
+      'updatedAt',
+    ],
+
+    where: {
+      id: id,
+
+      email: email,
+    },
+
+    offset: page * 20,
+
+    limit: 20,
+
+    order: [['updatedAt', 'DESC']],
+  };
+
+  if (!email) {
+    delete queryObject.where.email;
+  }
+
+  if (!id) {
+    delete queryObject.where.id;
+  }
+
+  if (!page) {
+    delete queryObject.limit;
+    delete queryObject.offset;
+  }
+
+  const aggregatorList =
+    email || id
+      ? await aggregators.findOne(queryObject)
+      : await aggregators.findAll(queryObject);
+
+  Array.isArray(aggregatorList)
+    ? res.json({
+        page: page,
+        length: aggregatorList.length,
+        result: aggregatorList,
+      })
+    : res.json({
+        page: page,
+        length: 1,
+        result: [aggregatorList],
+      });
+
+  console.log(page);
+};
+
 module.exports = {
   addTerminalId,
   getTransactions,
@@ -875,5 +964,6 @@ module.exports = {
   changeAgentType,
   changePassword,
   assignAggregator,
-  transactionGetter
+  transactionGetter,
+  getAggregators,
 };

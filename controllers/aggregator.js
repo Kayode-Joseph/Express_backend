@@ -8,11 +8,24 @@ const bcrypt = require('bcrypt');
 
 const jwt = require('jsonwebtoken');
 
+const axios = require('axios').default;
+
 require('dotenv').config();
 
-const { aggregators, aggregator_wallet } = require('../DB/models');
+const {
+  aggregators,
+  aggregator_wallet,
+  transactions,
+  transaction_fees,
+  banks,
+} = require('../DB/models');
 
-const {transactionGetter} = require('./admin')
+const { transactionGetter } = require('./admin');
+
+const { paymentValidator } = require('../controllers/wallet');
+const { aggregatorWalletTransactions } = require('../DB/models');
+
+const { eTranzactCaller } = require('../controllers/wallet');
 
 const register = async (req, res) => {
   const { email, password, name, phoneNumber, walletPin } = req.body;
@@ -105,15 +118,17 @@ const login = async (req, res) => {
     user_that_want_to_login.dataValues.password
   );
 
-
   if (is_password_the_same === true) {
-    const aggregatorId= user_that_want_to_login.dataValues.id;
+    const aggregatorId = user_that_want_to_login.dataValues.id;
 
- 
     try {
-      const token = jwt.sign({ aggregatorId: aggregatorId }, process.env.AGGREGATORSECRET, {
-        expiresIn: '1d',
-      });
+      const token = jwt.sign(
+        { aggregatorId: aggregatorId },
+        process.env.AGGREGATORSECRET,
+        {
+          expiresIn: '1d',
+        }
+      );
 
       delete user_that_want_to_login.dataValues.password;
       delete user_that_want_to_login.dataValues.aggregator_wallet.dataValues
@@ -135,32 +150,30 @@ const getAggregatorTransactions = async (req, res) => {
   if (!userId) {
     throw new UnauthenticatedError('UNAUTHORIZED');
   }
-   const page = req.query.page;
+  const page = req.query.page;
 
-   const stormId = req.query.stormId;
+  const stormId = req.query.stormId;
 
-   const rrn = req.query.rrn;
+  const rrn = req.query.rrn;
 
-   const tid = req.query.tid;
+  const tid = req.query.tid;
 
-   const reference = req.query.reference;
+  const reference = req.query.reference;
 
-   const dateLowerBound = req.query.dateLowerBound;
+  const dateLowerBound = req.query.dateLowerBound;
 
-   const dateUpperBound = req.query.dateUpperBound;
+  const dateUpperBound = req.query.dateUpperBound;
 
-
-   const transactionList = await transactionGetter({
-     page,
-     stormId,
-     rrn,
-     tid,
-     reference,
-     dateLowerBound,
-     dateUpperBound,
-     aggregatorId: userId
-   });
-
+  const transactionList = await transactionGetter({
+    page,
+    stormId,
+    rrn,
+    tid,
+    reference,
+    dateLowerBound,
+    dateUpperBound,
+    aggregatorId: userId,
+  });
 
   Array.isArray(transactionList)
     ? res.json({
@@ -173,12 +186,287 @@ const getAggregatorTransactions = async (req, res) => {
         length: 1,
         result: [transactionList],
       });
-
-
-
-
-
-
-
 };
-module.exports = { register, login, getAggregatorTransactions};
+
+const debitAggregatorWallet = async (req, res, next) => {
+  const { userId } = req.user;
+
+  const { aggregatorId } = req.params;
+
+  const {
+    accountNumber,
+
+    senderName,
+
+    recieverName,
+
+    bankCode,
+
+    id,
+
+    amount,
+    pin,
+  } = req.body;
+
+  if (
+    !id ||
+    !accountNumber ||
+    !recieverName ||
+    !senderName ||
+    !amount ||
+    !bankCode ||
+    !pin
+  ) {
+    throw new BadRequestError('missing field');
+  }
+
+  if (isNaN(amount)) {
+    throw new BadRequestError('invalid datatype for amount');
+  }
+
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
+
+  if (userId != aggregatorId || id != userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
+
+  const bank = await banks.findOne({
+    attributes: ['bank_code'],
+
+    where: {
+      bank_code: bankCode,
+    },
+  });
+
+  if (!bank) {
+    throw new BadRequestError('invalid bank code');
+  }
+
+  const {
+    stormWallet,
+    transactionFee,
+    check_if_available_balance_is_sufficient_for_transaction,
+    user_from_database,
+    userType,
+  } = await paymentValidator(
+    amount,
+    aggregators,
+    aggregator_wallet,
+    aggregatorId,
+    transaction_fees,
+    BadRequestError,
+    NotFoundError,
+    pin,
+    true,
+    {
+      aggregator_id: aggregatorId,
+    }
+  );
+
+  if (check_if_available_balance_is_sufficient_for_transaction == -1) {
+    res.status(200).json({
+      code: 502,
+      message: 'insufficient balance please fund aggregator wallet',
+    });
+
+    return;
+  }
+
+  const referenceRandom = `FTSTORM${Math.floor(
+    Math.random() * 1000000000000000
+  )}`;
+
+  const description = `from ${senderName.substring(
+    0,
+    8
+  )} to ${recieverName.substring(0, 8)} via NetPos`;
+
+  const debitTransaction = await transactions.create({
+    bank_code: bankCode,
+    amount: -amount,
+    reference: referenceRandom,
+    description: description,
+    destination: accountNumber,
+    senderName: senderName,
+    endPoint: 'A',
+
+    aggregator_id: aggregatorId,
+    transaction_status: 'declined',
+    user_type: userType,
+    transaction_fee: -transactionFee.dataValues.transfer_out_fee,
+    transaction_type: 'debit',
+  });
+
+  //res.send(eTranzactResponse.data);
+
+  const eTranzactResponse = await eTranzactCaller(
+    bankCode,
+    senderName,
+    recieverName,
+    accountNumber,
+    amount,
+    description,
+    referenceRandom,
+    debitTransaction,
+    next
+  );
+
+  if (!eTranzactResponse) {
+    throw new Error('something went wrong');
+  }
+
+  if (eTranzactResponse.data.error === '0') {
+    stormWallet.ledger_balance =
+      stormWallet.dataValues.ledger_balance -
+      amount -
+      transactionFee.dataValues.transfer_out_fee;
+
+    stormWallet.wallet_balance =
+      stormWallet.dataValues.wallet_balance -
+      amount -
+      transactionFee.dataValues.transfer_out_fee;
+
+    await stormWallet.save({
+      fields: ['ledger_balance', 'wallet_balance'],
+    });
+
+    debitTransaction.reference_from_etranzact =
+      eTranzactResponse.data.reference;
+
+    debitTransaction.response_code = eTranzactResponse.data.error;
+
+    debitTransaction.response_message = eTranzactResponse.data.message;
+
+    debitTransaction.transaction_status = 'approved';
+
+    await debitTransaction.save({
+      fields: [
+        'reference_from_etranzact',
+        'response_code',
+        'response_message',
+        'transaction_status',
+      ],
+    });
+
+    res.status(200).json({
+      code: '0',
+
+      message: 'Account Credited Successfully',
+
+      data: {
+        ledger_balance: stormWallet.dataValues.ledger_balance,
+
+        wallet_balance: stormWallet.dataValues.wallet_balance,
+      },
+    });
+
+    return;
+  }
+
+  debitTransaction.reference_from_etranzact = eTranzactResponse.data.reference;
+
+  debitTransaction.response_code = eTranzactResponse.data.error;
+
+  debitTransaction.response_message = eTranzactResponse.data.message;
+
+  await debitTransaction.save({
+    fields: ['reference_from_etranzact', 'response_code', 'response_message'],
+  });
+
+  res.json({
+    code: eTranzactResponse.data.error,
+    message: eTranzactResponse.data.message,
+  });
+};
+
+const verifyNameAggregator = async (req, res) => {
+  const { userId } = req.user;
+
+  const { id, bankCode, accountNumber } = req.body;
+
+  if (!id || !bankCode || !accountNumber) {
+    throw new BadRequestError('missing field');
+  }
+
+  if (id != userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
+
+  const referenceRandom = Math.floor(Math.random() * 1000000000000000);
+
+  const eTranzactResponse = await axios.post(
+    'https://www.etranzact.net/rest/switchIT/api/v1/account-query',
+    {
+      action: 'AQ',
+      terminalId: process.env.TID,
+      transaction: {
+        pin: process.env.AES,
+        bankCode: bankCode,
+        amount: '0.0',
+        description: 'Account Query',
+        destination: accountNumber,
+        reference: `AQSTORM${referenceRandom}`,
+        endPoint: 'A',
+      },
+    },
+    { timeout: 15000 }
+  );
+
+  if (eTranzactResponse.data.error === '0') {
+    res.status(200).json({
+      code: eTranzactResponse.data.error,
+      message: eTranzactResponse.data.message,
+    });
+    return;
+  } else if (eTranzactResponse.data.error == 24) {
+    res.status(200).json({ code: 24, message: eTranzactResponse.data.message });
+
+    return;
+  }
+
+  res.status(200).json({
+    code: eTranzactResponse.data.error,
+    message: eTranzactResponse.data.message,
+  });
+};
+
+const getWalletBalance = async (req, res) => {
+  const { userId } = req.user;
+
+  const { id } = req.params;
+
+  if (!userId) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
+ 
+
+
+  if (userId != id) {
+    throw new UnauthenticatedError('UNAUTHORIZED');
+  }
+
+ 
+
+  const aggregatorWallet = await aggregator_wallet.findOne({
+    attributes: ['wallet_balance', 'ledger_balance'],
+    where: {
+      aggregator_id: userId,
+    },
+  });
+
+  res.json({
+    wallet_balance: aggregatorWallet.dataValues.wallet_balance,
+    ledger_balance: aggregatorWallet.dataValues.ledger_balance,
+  });
+};
+
+module.exports = {
+  register,
+  login,
+  getAggregatorTransactions,
+  debitAggregatorWallet,
+  verifyNameAggregator,
+  getWalletBalance
+};

@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const axios = require('axios').default;
 
-const { paymentValidator } = require('./wallet');
+
 
 const bcrypt = require('bcrypt');
 

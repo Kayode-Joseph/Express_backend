@@ -14,6 +14,7 @@ const {
   storm_wallet,
   merchant_transaction_cache,
   transaction_fees,
+  aggregator_wallet,
 } = require('../DB/models');
 
 //not a route, function to get debit wallet transactions
@@ -288,6 +289,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     routing_channel: routingChannel,
     transaction_type: 'credit',
     aggregator_id: userFromDB.dataValues.aggregator_id,
+    aggregator_fee:null
   });
 
   if (transactionStatus === 'declined') {
@@ -298,13 +300,13 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     return;
   }
 
-  const transactionFee = await transaction_fees.findOne({
+  const transactionFeeRate = await transaction_fees.findOne({
     where: {
       agent_type: userType,
     },
   });
 
-  if (!transactionFee) {
+  if (!transactionFeeRate) {
     throw new BadRequestError('wrong user type');
   }
 
@@ -321,23 +323,25 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     throw new NotFoundError('user not found in storm database');
   }
 
+  let transactionFee= null
+
   if (userType.includes('agent')) {
     let amount_to_credit = null;
 
-    if (amount >= transactionFee.dataValues.max_debit_amount) {
-      amount_to_credit = amount - transactionFee.dataValues.cap;
+    if (amount >= transactionFeeRate.dataValues.max_debit_amount) {
+      amount_to_credit = amount - transactionFeeRate.dataValues.cap;
     } else if (
-      amount < transactionFee.dataValues.max_debit_amount &&
+      amount < transactionFeeRate.dataValues.max_debit_amount &&
       userType === 'agent_1'
     ) {
       amount_to_credit =
-        amount * transactionFee.dataValues.transaction_percentage;
+        amount * transactionFeeRate.dataValues.transaction_percentage;
     } else if (
-      amount < transactionFee.dataValues.max_debit_amount &&
+      amount < transactionFeeRate.dataValues.max_debit_amount &&
       userType === 'agent_2'
     ) {
       amount_to_credit =
-        amount * transactionFee.dataValues.transaction_percentage;
+        amount * transactionFeeRate.dataValues.transaction_percentage;
     } else {
       throw new BadRequestError('invalid user type');
     }
@@ -358,24 +362,25 @@ const updateTransactionAndWalletBalance = async (req, res) => {
 
     created_transaction.settlement_status = 'completed';
 
-    const transaction_fee = amount - amount_to_credit;
+    transactionFee = amount - amount_to_credit;
 
-    created_transaction.transaction_fee = -transaction_fee;
+    created_transaction.transaction_fee = -transactionFee;
 
     await created_transaction.save({
       fields: ['settlement_status', 'transaction_fee'],
     });
 
     res.send('transaction created and wallet updated');
-  } else if (userType === 'merchant') {
+  } 
+  else if (userType === 'merchant') {
     const ledger_balance = owner_of_storm_wallet.dataValues.ledger_balance;
 
     let amount_to_credit =
-      amount * transactionFee.dataValues.transaction_percentage;
+      amount * transactionFeeRate.dataValues.transaction_percentage;
 
     //when 0.9935
-    if (amount > transactionFee.dataValues.max_debit_amount) {
-      amount_to_credit = amount - transactionFee.dataValues.cap;
+    if (amount > transactionFeeRate.dataValues.max_debit_amount) {
+      amount_to_credit = amount - transactionFeeRate.dataValues.cap;
     }
 
     const new_wallet_balance = ledger_balance + amount_to_credit;
@@ -388,9 +393,10 @@ const updateTransactionAndWalletBalance = async (req, res) => {
       fields: ['ledger_balance'],
     });
 
-    const transaction_fee = amount - amount_to_credit;
+    transactionFee = amount - amount_to_credit;
 
-    created_transaction.transaction_fee = -transaction_fee;
+    
+    created_transaction.transaction_fee = -transactionFee;
 
     await created_transaction.save({
       fields: ['transaction_fee'],
@@ -407,9 +413,66 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     }
 
     res.send('transaction created');
-  } else {
-    throw new BadRequestError('invalid user type');
+  } 
+
+const aggregatorId = userFromDB.dataValues.aggregator_id;
+
+
+
+if (aggregatorId) {
+  const aggregatorFeeRate = await transaction_fees.findOne({
+    where: {
+      agent_type: 'aggregator',
+    },
+  });
+
+  const aggregatorPercentage =
+    aggregatorFeeRate.dataValues.transaction_percentage;
+
+   
+
+  const aggregatorFee = aggregatorPercentage * transactionFee;
+
+  const aggregatorWallet = await aggregator_wallet.findOne({
+    where: {
+      
+      aggregator_id: aggregatorId},
+  });
+
+  if (!aggregatorWallet) {
+    throw new NotFoundError('aggregator not found!');
   }
+
+  aggregatorWallet.wallet_balance =
+    aggregatorWallet.dataValues.wallet_balance + aggregatorFee;
+
+  aggregatorWallet.ledger_balance =
+    aggregatorWallet.dataValues.ledger_balance + aggregatorFee;
+
+  await aggregatorWallet.save({
+    fields: ['wallet_balance', 'ledger_balance'],
+  });
+
+  
+
+  created_transaction.aggregator_fee = aggregatorFee;
+
+
+   await created_transaction.save({
+     fields: ['aggregator_fee'],
+   });
+
+
+   return
+
+
+
+}
+
+
+
+
+
 };
 
 const getTransactions = async (req, res) => {

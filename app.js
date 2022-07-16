@@ -85,6 +85,7 @@ app.use('/api/v1/banks', bankRouter);
 
 app.use('/api/v1/admin', adminRouter);
 
+app.use('/api/v1/aggregator', aggregatorRouter);
 
 
 
@@ -92,8 +93,6 @@ app.use(authorize);
 
 app.use('/api/v1/auth', authRouter);
 
-
-app.use('/api/v1/aggregator', aggregatorRouter)
 
 app.use(jwt_authorize);
 

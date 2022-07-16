@@ -17,7 +17,8 @@ const {
   getTerminalIds,
   changeAgentType,
   changePassword,
-  assignAggregator
+  assignAggregator,
+  getAggregators
   
 } = require('../controllers/admin');
 
@@ -50,6 +51,10 @@ routers.route('/debit').get(adminAuth,getDebitTransactions)
 
 
 routers.route('/aggregator').put(adminAuth, assignAggregator);
+
+routers.route('/aggregator').get(adminAuth, getAggregators);
+
+
 
 
 

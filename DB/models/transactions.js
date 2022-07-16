@@ -26,7 +26,6 @@ module.exports = (sequelize, DataTypes) => {
       },
       storm_id: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
       rrn: {
         type: DataTypes.STRING,
@@ -68,7 +67,7 @@ module.exports = (sequelize, DataTypes) => {
       destination: DataTypes.STRING,
       sender_name: DataTypes.STRING,
       endPoint: DataTypes.STRING,
-  
+
       response_message: DataTypes.STRING,
       transaction_fee: {
         type: DataTypes.DOUBLE,
@@ -190,12 +189,11 @@ module.exports = (sequelize, DataTypes) => {
           onUpdate: 'CASCADE',
           onDelete: 'CASCADE',
         },
-
-        aggregator_fee: {
-          allowNull: true,
-          defaultValue: null,
-          type: DataTypes.DOUBLE,
-        },
+      },
+      aggregator_fee: {
+        allowNull: true,
+        defaultValue: null,
+        type: DataTypes.DOUBLE,
       },
     },
 
