@@ -2,7 +2,10 @@ const express = require('express');
 
 const routers = express.Router();
 
-const { register , login, getAggregatorTransactions, debitAggregatorWallet, verifyNameAggregator, getWalletBalance} = require('../controllers/aggregator');
+const { register , login, getAggregatorTransactions, debitAggregatorWallet, verifyNameAggregator, getWalletBalance, getAggregatorAgents} = require('../controllers/aggregator');
+
+
+
 
 const aggregatorAuth=require('../middleware/aggregator_auth')
 const aggregators = require('../DB/models/aggregators');
@@ -16,6 +19,15 @@ routers.route('/verify').post(aggregatorAuth,verifyNameAggregator);
 routers.route('/transactions').get(aggregatorAuth,getAggregatorTransactions);
 
 routers.route('/transactions/:aggregatorId').post(aggregatorAuth, debitAggregatorWallet);
+
+
+routers.route('/users').get(aggregatorAuth, getAggregatorAgents )
+
+
+
+
+
+
 
 routers
   .route('/wallet/:id')
