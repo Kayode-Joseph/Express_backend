@@ -209,7 +209,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
   });
 
   if (checkIfTransactionExists) {
-    res.status(409).send('transaction with rrn ' + RRN + ' already exists');
+    res.status(409).json({msg: 'transaction with rrn ' + RRN + ' already exists'});
 
     return;
   }
@@ -370,7 +370,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
       fields: ['settlement_status', 'transaction_fee'],
     });
 
-    res.send('transaction created and wallet updated');
+    res.json({msg:'transaction created and wallet updated'});
   } 
   else if (userType === 'merchant') {
     const ledger_balance = owner_of_storm_wallet.dataValues.ledger_balance;
@@ -412,7 +412,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
       throw new Error('something went wrong');
     }
 
-    res.send('transaction created');
+    res.json({msg:'transaction created'});
   } 
 
 const aggregatorId = userFromDB.dataValues.aggregator_id;
