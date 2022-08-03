@@ -56,7 +56,7 @@ const transactions_tracker = async () => {
     raw: true,
   });
 
-  console.log(transaction_list);
+
 
   return transaction_list.length == 1
     ? [transaction_list[0].count, transaction_list[0].sum]

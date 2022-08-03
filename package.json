@@ -1,42 +1,42 @@
 {
-  "name": "sequelize",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node app.js",
-    "undo": "../node_modules/.bin/sequelize db:migrate:undo:all",
-    "loadtest_register": "loadtest -H \"api_key:123456\" -p TEST/req_body_for_register.js -T application/json -m POST -n 200 -c 10 http://localhost:3000/api/v1/auth/register ",
-    "loadtest_transaction": "loadtest -H \"api_key:123456\" -H \"Authorization:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdG9ybUlkIjoiYjEyNGU4MzAtODYyMS00N2VjLTliNzctZWM2ZGNmODJmM2U5IiwiaWF0IjoxNjUxNTkyMzQ3LCJleHAiOjE2NTE1OTQxNDd9.ytiDEjX4Gzp1w1tS_1stwadV6u9h9rgzTUQaQwjs6oM\" -p TEST/req_body_for_transaction_endpoint.js -T application/json -m POST -n 200 -c 10 http://localhost:3000/api/v1/transaction/e7a8c427-d88a-4504-9e53-31be114ddd66"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "axios": "^0.27.2",
-    "bcrypt": "^5.0.1",
-    "chalk": "^4.1.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.0.0",
-    "env": "^0.0.2",
-    "etz-encryptor": "^1.0.0",
-    "express": "^4.18.0",
-    "express-async-errors": "^3.1.1",
-    "express-rate-limit": "^6.4.0",
-    "helmet": "^5.0.2",
-    "http-status-codes": "^2.2.0",
-    "jsonwebtoken": "^8.5.1",
-    "morgan": "^1.10.0",
-    "mysql2": "^2.3.3",
-    "node-cron": "^3.0.0",
-    "nodemailer": "^6.7.5",
-    "nodemon": "^2.0.15",
-    "sequelize": "^6.19.0",
-    "sequelize-cli": "^6.4.1",
-    "xss-clean": "^0.1.1"
-  },
-  "engines": {
-    "node": "16.x"
-  }
+    "name": "sequelize",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "node app.js",
+        "undo": "../node_modules/.bin/sequelize db:migrate:undo:all",
+        "loadtest_register": "loadtest -H \"api_key:123456\" -p TEST/req_body_for_register.js -T application/json -m POST -n 200 -c 10 http://localhost:3000/api/v1/auth/register ",
+        "loadtest_transaction": "loadtest -H \"api_key:123456\" -H \"Authorization:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdG9ybUlkIjoiMGE0MWQzZjktZTYyYi00ODQ2LTg3NjUtZjdiNjY2M2ViYmJmIiwiaWF0IjoxNjU5MzkwODMwLCJleHAiOjE2NTk0NzcyMzB9.nIdMesSz7UcXciDu7dttpaZaMsX-cmbeqCacgjlP_V8\" -p TEST/req_body_for_transaction_endpoint.js -T application/json -m POST -n 200 -c 10 http://localhost:3000/api/v1/transaction/e7a8c427-d88a-4504-9e53-31be114ddd66"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "axios": "^0.27.2",
+        "bcrypt": "^5.0.1",
+        "chalk": "^4.1.2",
+        "cors": "^2.8.5",
+        "dotenv": "^16.0.0",
+        "env": "^0.0.2",
+        "etz-encryptor": "^1.0.0",
+        "express": "^4.18.0",
+        "express-async-errors": "^3.1.1",
+        "express-rate-limit": "^6.4.0",
+        "helmet": "^5.0.2",
+        "http-status-codes": "^2.2.0",
+        "jsonwebtoken": "^8.5.1",
+        "morgan": "^1.10.0",
+        "mysql2": "^2.3.3",
+        "node-cron": "^3.0.0",
+        "nodemailer": "^6.7.5",
+        "nodemon": "^2.0.15",
+        "sequelize": "^6.19.0",
+        "sequelize-cli": "^6.4.1",
+        "xss-clean": "^0.1.1"
+    },
+    "engines": {
+        "node": "16.x"
+    }
 }

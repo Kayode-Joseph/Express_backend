@@ -1,11 +1,19 @@
 
 {
   "development": {
-    "username": "root",
-    "password": "secret",
-    "database": "netplus_storm",
-    "host": "localhost",
-    "dialect": "mysql"
+      "username": "root",
+      "password": "secret",
+      "database": "netplus_storm",
+      "host": "localhost",
+      "dialect": "mysql",
+
+      "pool": {
+          "max": 10,
+          "min": 0,
+          "acquire": 30000,
+          "idle": 10000
+      },
+      "logging": false
   },
   "test": {
     "username": "root",

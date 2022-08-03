@@ -258,35 +258,35 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     if (userType === 'agent_1' || userType === 'agent_2') {
         let netposWebHookResponse = null;
 
-        for (let i = 0; i < 2; i++) {
-            if (netposWebHookResponse) {
-                if (netposWebHookResponse.data.status != 'success') {
-                    console.log(
-                        chalk.red(JSON.stringify(netposWebHookResponse.data))
-                    );
-                }
+        // for (let i = 0; i < 2; i++) {
+        //     if (netposWebHookResponse) {
+        //         if (netposWebHookResponse.data.status != 'success') {
+        //             console.log(
+        //                 chalk.red(JSON.stringify(netposWebHookResponse.data))
+        //             );
+        //         }
 
-                break;
-            }
+        //         break;
+        //     }
 
-            try {
-                netposWebHookResponse = await netposWebHookFunc(
-                    req,
-                    RRN,
-                    transactionStatus
-                );
-            } catch (e) {
-                console.log(
-                    chalk.red(
-                        JSON.stringify(e) +
-                            '\n count:' +
-                            i +
-                            '\ntime: ' +
-                            new Date(Date.now())
-                    )
-                );
-            }
-        }
+        //     try {
+        //         netposWebHookResponse = await netposWebHookFunc(
+        //             req,
+        //             RRN,
+        //             transactionStatus
+        //         );
+        //     } catch (e) {
+        //         console.log(
+        //             chalk.red(
+        //                 JSON.stringify(e) +
+        //                     '\n count:' +
+        //                     i +
+        //                     '\ntime: ' +
+        //                     new Date(Date.now())
+        //             )
+        //         );
+        //     }
+        // }
     }
 
     //logging the transaction
@@ -347,19 +347,6 @@ const updateTransactionAndWalletBalance = async (req, res) => {
         throw new BadRequestError('wrong user type');
     }
 
-    //updating storm wallet
-
-    const owner_of_storm_wallet = await storm_wallet.findOne({
-        //attributes: ['wallet_balance'],
-        where: {
-            storm_id: stormId,
-        },
-    });
-
-    if (!owner_of_storm_wallet) {
-        throw new NotFoundError('user not found in storm database');
-    }
-
     let transactionFee = null;
 
     if (userType.includes('agent')) {
@@ -383,21 +370,6 @@ const updateTransactionAndWalletBalance = async (req, res) => {
             throw new BadRequestError('invalid user type');
         }
 
-        const new_wallet_balance =
-            owner_of_storm_wallet.dataValues.wallet_balance;
-
-        console.log('amount' + amount_to_credit);
-
-        owner_of_storm_wallet.ledger_balance =
-            new_wallet_balance + amount_to_credit;
-
-        owner_of_storm_wallet.wallet_balance =
-            new_wallet_balance + amount_to_credit;
-
-        await owner_of_storm_wallet.save({
-            fields: ['ledger_balance', 'wallet_balance'],
-        });
-
         created_transaction.settlement_status = 'completed';
 
         transactionFee = amount - amount_to_credit;
@@ -410,8 +382,6 @@ const updateTransactionAndWalletBalance = async (req, res) => {
 
         res.json({ msg: 'transaction created and wallet updated' });
     } else if (userType === 'merchant') {
-        const ledger_balance = owner_of_storm_wallet.dataValues.ledger_balance;
-
         let amount_to_credit =
             amount * transactionFeeRate.dataValues.transaction_percentage;
 
@@ -419,16 +389,6 @@ const updateTransactionAndWalletBalance = async (req, res) => {
         if (amount > transactionFeeRate.dataValues.max_debit_amount) {
             amount_to_credit = amount - transactionFeeRate.dataValues.cap;
         }
-
-        const new_wallet_balance = ledger_balance + amount_to_credit;
-
-        console.log(new_wallet_balance);
-
-        owner_of_storm_wallet.ledger_balance = new_wallet_balance;
-
-        await owner_of_storm_wallet.save({
-            fields: ['ledger_balance'],
-        });
 
         transactionFee = amount - amount_to_credit;
 
@@ -465,25 +425,25 @@ const updateTransactionAndWalletBalance = async (req, res) => {
 
         const aggregatorFee = aggregatorPercentage * transactionFee;
 
-        const aggregatorWallet = await aggregator_wallet.findOne({
-            where: {
-                aggregator_id: aggregatorId,
-            },
-        });
+        // const aggregatorWallet = await aggregator_wallet.findOne({
+        //     where: {
+        //         aggregator_id: aggregatorId,
+        //     },
+        // });
 
-        if (!aggregatorWallet) {
-            throw new NotFoundError('aggregator not found!');
-        }
+        // if (!aggregatorWallet) {
+        //     throw new NotFoundError('aggregator not found!');
+        // }
 
-        aggregatorWallet.wallet_balance =
-            aggregatorWallet.dataValues.wallet_balance + aggregatorFee;
+        // aggregatorWallet.wallet_balance =
+        //     aggregatorWallet.dataValues.wallet_balance + aggregatorFee;
 
-        aggregatorWallet.ledger_balance =
-            aggregatorWallet.dataValues.ledger_balance + aggregatorFee;
+        // aggregatorWallet.ledger_balance =
+        //     aggregatorWallet.dataValues.ledger_balance + aggregatorFee;
 
-        await aggregatorWallet.save({
-            fields: ['wallet_balance', 'ledger_balance'],
-        });
+        // await aggregatorWallet.save({
+        //     fields: ['wallet_balance', 'ledger_balance'],
+        // });
 
         created_transaction.aggregator_fee = aggregatorFee;
 

@@ -1,50 +1,32 @@
-
-
 const {
-  NotFoundError,
-  UnauthenticatedError,
-  BadRequestError,
+    NotFoundError,
+    UnauthenticatedError,
+    BadRequestError,
 } = require('../errors');
 
-const {
-banks
-} = require('../DB/models');
+const { banks } = require('../DB/models');
 
-
-const getAllBanks= async(req,res)=>{
-
+const getAllBanks = async (req, res) => {
     const allBanks = await banks.findAll({
+        attributes: ['bank_code', 'bank_name'],
+    });
 
-        attributes:['bank_code','bank_name']
-    })
-
-
-
-    res.send(allBanks)
-
-
-}
-
-const getOneBank = async (req, res) => {
-    const code= req.params.code
-  const oneBank = await banks.findOne(
-
-    
-
-    {
-        attributes:['bank_code','bank_name'],
-        where:{
-            bank_code:code
-        }
-    }
-  );
-
-  res.send(oneBank);
+    res.send(allBanks);
 };
 
-module.exports={
+const getOneBank = async (req, res) => {
+    const code = req.params.code;
+    const oneBank = await banks.findOne({
+        attributes: ['bank_code', 'bank_name'],
+        where: {
+            bank_code: code,
+        },
+    });
 
-    getAllBanks, getOneBank
-}
+    res.send(oneBank);
+};
 
-
+module.exports = {
+    getAllBanks,
+    getOneBank,
+};

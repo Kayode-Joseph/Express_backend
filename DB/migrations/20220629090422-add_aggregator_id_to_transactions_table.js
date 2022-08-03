@@ -15,7 +15,7 @@ await queryInterface.addColumn('transactions', 'aggregator_id', {
 
   
 
-});
+}  )  ;
 
 await queryInterface.addColumn('transactions', 'aggregator_fee', {
   allowNull: true,

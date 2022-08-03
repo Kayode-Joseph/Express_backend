@@ -12,33 +12,36 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   storm_wallet.init(
-    {
-      storm_id: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        primaryKey: true,
+      {
+          storm_id: {
+              type: DataTypes.STRING,
+              allowNull: false,
+              primaryKey: true,
+          },
+          wallet_balance: {
+              type: DataTypes.FLOAT,
+              allowNull: false,
+              validator: { notNull: true, isDecimal: true },
+          },
+          ledger_balance: {
+              type: DataTypes.FLOAT,
+              allowNull: false,
+              validator: { notNull: true, isDecimal: true },
+          },
+          pin: {
+              type: DataTypes.STRING,
+              allowNull: false,
+          },
+          isBusy: {
+              allowNull: false,
+              defaultValue: false,
+              type: DataTypes.BOOLEAN,
+          },
       },
-      wallet_balance: {
-        type: DataTypes.FLOAT,
-        allowNull: false,
-        validator: { notNull: true, isDecimal: true },
-      },
-      ledger_balance: {
-        type: DataTypes.FLOAT,
-        allowNull: false,
-        validator: { notNull: true, isDecimal: true },
-      },
-      pin: {
-        type: DataTypes.STRING,
-        allowNull: false,
-      
-      },
-
-    },
-    {
-      sequelize,
-      modelName: 'storm_wallet',
-    }
+      {
+          sequelize,
+          modelName: 'storm_wallet',
+      }
   );
   return storm_wallet;
 };

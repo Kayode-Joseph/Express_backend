@@ -3,14 +3,12 @@ const { StatusCodes } = require('http-status-codes');
 const chalk = require('chalk');
 const errorHandlerMiddleware = (err, req, res, next) => {
     if (err instanceof CustomAPIError) {
-        console.log(err);
+        // console.log(err);
         res.status(err.statusCode).json({ msg: err.message });
 
         return;
     }
-    console.log(
-        chalk.red(JSON.stringify(err + '\ntime: ' + new Date(Date.now())))
-    );
+    console.log(err);
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: err.message });
     return;
 };

@@ -23,10 +23,13 @@ const {
 
 const { transactionGetter } = require('./admin');
 
-const { paymentValidator } = require('../controllers/wallet');
+const {
+    paymentValidator,
+    balanceGetter,
+    eTranzactCaller,
+    toggleBusyFlag,
+} = require('../controllers/wallet');
 const { aggregatorWalletTransactions } = require('../DB/models');
-
-const { eTranzactCaller } = require('../controllers/wallet');
 
 const register = async (req, res) => {
     const { email, password, name, phoneNumber, walletPin } = req.body;
@@ -278,6 +281,15 @@ const debitAggregatorWallet = async (req, res, next) => {
         return;
     }
 
+    if (stormWallet.isBusy == true) {
+        res.status(200).json({
+            code: 503,
+            message: 'wallet is busy',
+        });
+
+        return;
+    }
+
     const referenceRandom = `FTSTORM${Math.floor(
         Math.random() * 1000000000000000
     )}`;
@@ -305,37 +317,35 @@ const debitAggregatorWallet = async (req, res, next) => {
 
     //res.send(eTranzactResponse.data);
 
-    const eTranzactResponse = await eTranzactCaller(
-        bankCode,
-        senderName,
-        recieverName,
-        accountNumber,
-        amount,
-        description,
-        referenceRandom,
-        debitTransaction,
-        next
-    );
+    toggleBusyFlag(stormWallet, true);
+
+    let eTranzactResponse = null;
+
+    try {
+        eTranzactResponse = await eTranzactCaller(
+            bankCode,
+            senderName,
+            recieverName,
+            accountNumber,
+            amount,
+            description,
+            referenceRandom,
+            debitTransaction,
+            next
+        );
+    } catch (e) {
+        toggleBusyFlag(stormWallet, false);
+
+        next(e);
+    }
 
     if (!eTranzactResponse) {
+        toggleBusyFlag(stormWallet, false);
+
         throw new Error('something went wrong');
     }
 
     if (eTranzactResponse.data.error === '0') {
-        stormWallet.ledger_balance =
-            stormWallet.dataValues.ledger_balance -
-            amount -
-            transactionFee.dataValues.transfer_out_fee;
-
-        stormWallet.wallet_balance =
-            stormWallet.dataValues.wallet_balance -
-            amount -
-            transactionFee.dataValues.transfer_out_fee;
-
-        await stormWallet.save({
-            fields: ['ledger_balance', 'wallet_balance'],
-        });
-
         debitTransaction.reference_from_etranzact =
             eTranzactResponse.data.reference;
 
@@ -366,9 +376,11 @@ const debitAggregatorWallet = async (req, res, next) => {
             },
         });
 
+        toggleBusyFlag(stormWallet, false);
         return;
     }
 
+    toggleBusyFlag(stormWallet, false);
     debitTransaction.reference_from_etranzact =
         eTranzactResponse.data.reference;
 
@@ -457,16 +469,11 @@ const getWalletBalance = async (req, res) => {
         throw new UnauthenticatedError('UNAUTHORIZED');
     }
 
-    const aggregatorWallet = await aggregator_wallet.findOne({
-        attributes: ['wallet_balance', 'ledger_balance'],
-        where: {
-            aggregator_id: userId,
-        },
-    });
+    const balance = await balanceGetter(id, true);
 
     res.json({
-        wallet_balance: aggregatorWallet.dataValues.wallet_balance,
-        ledger_balance: aggregatorWallet.dataValues.ledger_balance,
+        wallet_balance: balance,
+        ledger_balance: balance,
     });
 };
 
@@ -517,20 +524,15 @@ const getAggregatorAgents = async (req, res) => {
 
     if (email) {
         count = 1;
-    }
-    else{
-
-        count=queryResult.count
-        queryResult=queryResult.rows
+    } else {
+        count = queryResult.count;
+        queryResult = queryResult.rows;
     }
 
-    if(!queryResult){
-
-        count=0
-        queryResult=[]
+    if (!queryResult) {
+        count = 0;
+        queryResult = [];
     }
-
-   
 
     res.json({
         page: page,
