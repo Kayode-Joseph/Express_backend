@@ -348,6 +348,10 @@ const debitWallet = async (req, res, next) => {
         throw new UnauthenticatedError('unauthorized');
     }
 
+    if (Math.sign(amount) != 1) {
+        throw new BadRequestError('invalid transaction amount');
+    }
+
     const bank = await banks.findOne({
         attributes: ['bank_code'],
 

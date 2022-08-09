@@ -157,7 +157,7 @@ const netposWebHookFunc = async (req, RRN, transactionStatus) => {
             },
         },
         {
-            timeout: 150,
+            timeout: 15000,
             headers: {
                 'content-type': 'application/json',
             },
@@ -224,6 +224,9 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     if (transactionStatus != 'approved' && transactionStatus != 'declined') {
         throw new BadRequestError('transaction status invalid');
     }
+    if (Math.sign(amount) != 1) {
+        throw new BadRequestError('invalid transaction amount');
+    }
 
     const checkIfTransactionExists = await transactions.findOne({
         attributes: ['rrn'],
@@ -258,35 +261,35 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     if (userType === 'agent_1' || userType === 'agent_2') {
         let netposWebHookResponse = null;
 
-        // for (let i = 0; i < 2; i++) {
-        //     if (netposWebHookResponse) {
-        //         if (netposWebHookResponse.data.status != 'success') {
-        //             console.log(
-        //                 chalk.red(JSON.stringify(netposWebHookResponse.data))
-        //             );
-        //         }
+        for (let i = 0; i < 2; i++) {
+            if (netposWebHookResponse) {
+                if (netposWebHookResponse.data.status != 'success') {
+                    console.log(
+                        chalk.red(JSON.stringify(netposWebHookResponse.data))
+                    );
+                }
 
-        //         break;
-        //     }
+                break;
+            }
 
-        //     try {
-        //         netposWebHookResponse = await netposWebHookFunc(
-        //             req,
-        //             RRN,
-        //             transactionStatus
-        //         );
-        //     } catch (e) {
-        //         console.log(
-        //             chalk.red(
-        //                 JSON.stringify(e) +
-        //                     '\n count:' +
-        //                     i +
-        //                     '\ntime: ' +
-        //                     new Date(Date.now())
-        //             )
-        //         );
-        //     }
-        // }
+            try {
+                netposWebHookResponse = await netposWebHookFunc(
+                    req,
+                    RRN,
+                    transactionStatus
+                );
+
+                console.log(netposWebHookResponse.data);
+            } catch (e) {
+                console.log(
+                    JSON.stringify(e) +
+                        '\n count: ' +
+                        i +
+                        '\ntime: ' +
+                        new Date(Date.now())
+                );
+            }
+        }
     }
 
     //logging the transaction
