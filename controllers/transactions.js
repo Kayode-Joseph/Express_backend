@@ -146,13 +146,14 @@ const debit_transaction_getter = async (
 };
 
 //function to push transaction to webhook
-const netposWebHookFunc = async (req, RRN, transactionStatus) => {
+const netposWebHookFunc = async (req, RRN, transactionStatus, userType, amount) => {
     const netposWebHookResponse = await axios.post(
-        process.env.WEBHOOKURL,
+        userType=== 'merchant'?  process.env.MERCHANTWEBHOOK : process.env.WEBHOOKURL ,
         {
             transactionResponse: {
                 ...req.body,
                 rrn: RRN,
+                amount: userType==='merchant'? amount*100 : amount,
                 responseMessage: transactionStatus,
             },
         },
@@ -258,7 +259,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
         throw new BadRequestError('userType mismatch');
     }
 
-    if (userType === 'agent_1' || userType === 'agent_2') {
+
         let netposWebHookResponse = null;
 
         for (let i = 0; i < 2; i++) {
@@ -276,7 +277,9 @@ const updateTransactionAndWalletBalance = async (req, res) => {
                 netposWebHookResponse = await netposWebHookFunc(
                     req,
                     RRN,
-                    transactionStatus
+                    transactionStatus,
+                    userType,
+                    amount
                 );
 
                 console.log(netposWebHookResponse.data);
@@ -290,7 +293,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
                 );
             }
         }
-    }
+    
 
     //logging the transaction
     const created_transaction = await transactions.create({

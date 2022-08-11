@@ -1,25 +1,33 @@
 const {
-  NotFoundError,
-  UnauthenticatedError,
-  BadRequestError,
+    NotFoundError,
+    UnauthenticatedError,
+    BadRequestError,
 } = require('../errors');
 
 const { Op } = require('sequelize');
 
 const Sequelize = require('sequelize');
 
+const { QueryTypes } = require('sequelize');
+
 const { debit_transaction_getter } = require('./transactions');
 
 const {
-  user,
-  transactions,
-  storm_wallet,
-  superadmin,
-  admin,
-  terminal_id,
-  aggregators,
-  aggregator_wallet,
+    user,
+    transactions,
+    storm_wallet,
+    superadmin,
+    admin,
+    terminal_id,
+    aggregators,
+    aggregator_wallet,
 } = require('../DB/models');
+
+const { toggleBusyFlag } = require('./wallet');
+
+const db = require('../DB/models');
+
+const sequelize = db.sequelize;
 
 const bcrypt = require('bcrypt');
 
@@ -29,941 +37,942 @@ require('dotenv').config();
 
 //not a route controller just a regular function
 const transactions_tracker = async () => {
-  const date_in_millis = new Date().getTime();
+    const date_in_millis = new Date().getTime();
 
-  // console.log(date_in_millis);
+    // console.log(date_in_millis);
 
-  const dateToGetUpper = new Date(date_in_millis);
+    const dateToGetUpper = new Date(date_in_millis);
 
-  const dateToGetLower = new Date(date_in_millis - 86400 * 1000);
+    const dateToGetLower = new Date(date_in_millis - 86400 * 1000);
 
-  const transaction_list = await transactions.findAll({
-    attributes: [
-      [Sequelize.fn('SUM', Sequelize.col('amount')), 'sum'],
-      [Sequelize.fn('count', Sequelize.col('amount')), 'count'],
-    ],
+    const transaction_list = await transactions.findAll({
+        attributes: [
+            [Sequelize.fn('SUM', Sequelize.col('amount')), 'sum'],
+            [Sequelize.fn('count', Sequelize.col('amount')), 'count'],
+        ],
 
-    group: ['transaction_type'],
+        group: ['transaction_type'],
 
-    where: {
-      createdAt: {
-        [Op.lt]: dateToGetUpper,
-        [Op.gt]: dateToGetLower,
-      },
-      transaction_status: 'approved',
-      transaction_type: 'credit',
-    },
-    raw: true,
-  });
+        where: {
+            createdAt: {
+                [Op.lt]: dateToGetUpper,
+                [Op.gt]: dateToGetLower,
+            },
+            transaction_status: 'approved',
+            transaction_type: 'credit',
+        },
+        raw: true,
+    });
 
-
-
-  return transaction_list.length == 1
-    ? [transaction_list[0].count, transaction_list[0].sum]
-    : [null, null];
+    return transaction_list.length == 1
+        ? [transaction_list[0].count, transaction_list[0].sum]
+        : [null, null];
 };
 
 //not a contoller just a function
 
 const transactionGetter = async (
-  param = {
-    rrn,
+    param = {
+        rrn,
 
-    reference,
+        reference,
 
-    stormId,
+        stormId,
 
-    page,
+        page,
 
-    tid,
+        tid,
 
-    dateLowerBound,
+        dateLowerBound,
 
-    dateUpperBound,
+        dateUpperBound,
 
-    aggregatorId,
-  }
+        aggregatorId,
+    }
 ) => {
-  const page = param.page;
+    const page = param.page;
 
-  const rrn = param.rrn;
+    const rrn = param.rrn;
 
-  const stormId = param.stormId;
+    const stormId = param.stormId;
 
-  const reference = param.reference;
+    const reference = param.reference;
 
-  const tid = param.tid;
+    const tid = param.tid;
 
-  const dateLowerBound = param.dateLowerBound;
+    const dateLowerBound = param.dateLowerBound;
 
-  const dateUpperBound = param.dateUpperBound;
+    const dateUpperBound = param.dateUpperBound;
 
-  const aggregatorId = param.aggregatorId;
+    const aggregatorId = param.aggregatorId;
 
-  if (dateLowerBound && !dateUpperBound) {
-    throw new BadRequestError('date lower bound requires date upper bound');
-  }
-
-  if (!dateLowerBound && dateUpperBound) {
-    throw new BadRequestError('date upper bound requires date lower bound');
-  }
-
-  let dateValidityChecker = false;
-
-  let dateLowerBound_in_milliseconds = null;
-
-  let dateUpperBound_in_milliseconds = null;
-
-  if (dateLowerBound && dateLowerBound) {
-    dateLowerBound_in_milliseconds = new Date(
-      dateLowerBound + ' 01:00'
-    ).getTime();
-
-    dateUpperBound_in_milliseconds =
-      new Date(dateUpperBound + ' 01:00').getTime() + 86400 * 1000;
-
-    function dateIsValid(date) {
-      return new Date(date) instanceof Date && !isNaN(date);
+    if (dateLowerBound && !dateUpperBound) {
+        throw new BadRequestError('date lower bound requires date upper bound');
     }
 
-    if (
-      !dateIsValid(dateLowerBound_in_milliseconds) ||
-      !dateIsValid(dateUpperBound_in_milliseconds)
-    ) {
-      throw new BadRequestError('invalid date fromat');
+    if (!dateLowerBound && dateUpperBound) {
+        throw new BadRequestError('date upper bound requires date lower bound');
     }
 
-    dateValidityChecker = true;
-  }
+    let dateValidityChecker = false;
 
-  let queryObject = {
-    attributes: [
-      'storm_id',
-      'terminal_id',
-      'amount',
-      'rrn',
-      'reference',
-      'user_type',
-      'createdAt',
-      'updatedAt',
-      'reference',
-      'amount',
-      'transaction_fee',
-      'description',
-      'destination',
-      'storm_id',
-      'transaction_status',
-      'settlement_status',
-      'transaction_type',
-      'aggregator_id',
-      'aggregator_fee',
-    ],
+    let dateLowerBound_in_milliseconds = null;
 
-    offset: 20 * page,
-    limit: 20,
+    let dateUpperBound_in_milliseconds = null;
 
-    where: {
-      rrn: rrn,
-      reference: reference,
-      terminal_id: tid,
-      storm_id: stormId,
-      aggregator_id: aggregatorId,
-      updatedAt: {
-        [Op.lt]: dateUpperBound_in_milliseconds,
-        [Op.gt]: dateLowerBound_in_milliseconds,
-      },
-    },
+    if (dateLowerBound && dateLowerBound) {
+        dateLowerBound_in_milliseconds = new Date(
+            dateLowerBound + ' 01:00'
+        ).getTime();
 
-    order: [['updatedAt', 'DESC']],
-  };
+        dateUpperBound_in_milliseconds =
+            new Date(dateUpperBound + ' 01:00').getTime() + 86400 * 1000;
 
-  if (page) {
-    if (isNaN(page)) {
-      throw new BadRequestError('query param page must be a number');
+        function dateIsValid(date) {
+            return new Date(date) instanceof Date && !isNaN(date);
+        }
+
+        if (
+            !dateIsValid(dateLowerBound_in_milliseconds) ||
+            !dateIsValid(dateUpperBound_in_milliseconds)
+        ) {
+            throw new BadRequestError('invalid date fromat');
+        }
+
+        dateValidityChecker = true;
     }
-  }
 
-  if (!aggregatorId) {
-    delete queryObject.where.aggregator_id;
-  }
+    let queryObject = {
+        attributes: [
+            'storm_id',
+            'terminal_id',
+            'amount',
+            'rrn',
+            'reference',
+            'user_type',
+            'createdAt',
+            'updatedAt',
+            'reference',
+            'amount',
+            'transaction_fee',
+            'description',
+            'destination',
+            'storm_id',
+            'transaction_status',
+            'settlement_status',
+            'transaction_type',
+            'aggregator_id',
+            'aggregator_fee',
+        ],
 
-  if (!rrn) {
-    delete queryObject.where.rrn;
-  }
+        offset: 20 * page,
+        limit: 20,
 
-  if (!reference) {
-    delete queryObject.where.reference;
-  }
-  if (!tid) {
-    delete queryObject.where.terminal_id;
-  }
-  if (!page) {
-    delete queryObject.offset;
+        where: {
+            rrn: rrn,
+            reference: reference,
+            terminal_id: tid,
+            storm_id: stormId,
+            aggregator_id: aggregatorId,
+            updatedAt: {
+                [Op.lt]: dateUpperBound_in_milliseconds,
+                [Op.gt]: dateLowerBound_in_milliseconds,
+            },
+        },
 
-    delete queryObject.limit;
-  }
+        order: [['updatedAt', 'DESC']],
+    };
 
-  if (!dateValidityChecker) {
-    delete queryObject.where.updatedAt;
-  }
+    if (page) {
+        if (isNaN(page)) {
+            throw new BadRequestError('query param page must be a number');
+        }
+    }
 
-  if (!stormId) {
-    delete queryObject.where.storm_id;
-  }
+    if (!aggregatorId) {
+        delete queryObject.where.aggregator_id;
+    }
 
-  const transaction_list = rrn
-    ? await transactions.findOne(queryObject)
-    : reference
-    ? await transactions.findOne(queryObject)
-    : await transactions.findAll(queryObject);
+    if (!rrn) {
+        delete queryObject.where.rrn;
+    }
 
-  return transaction_list;
+    if (!reference) {
+        delete queryObject.where.reference;
+    }
+    if (!tid) {
+        delete queryObject.where.terminal_id;
+    }
+    if (!page) {
+        delete queryObject.offset;
+
+        delete queryObject.limit;
+    }
+
+    if (!dateValidityChecker) {
+        delete queryObject.where.updatedAt;
+    }
+
+    if (!stormId) {
+        delete queryObject.where.storm_id;
+    }
+
+    const transaction_list = rrn
+        ? await transactions.findOne(queryObject)
+        : reference
+        ? await transactions.findOne(queryObject)
+        : await transactions.findAll(queryObject);
+
+    return transaction_list;
 };
 
 const transactionsTrackerRoute = async (req, res) => {
-  const { userId } = req.user;
+    const { userId } = req.user;
 
-  if (!userId) {
-    throw new UnauthenticatedError('not authorized');
-  }
+    if (!userId) {
+        throw new UnauthenticatedError('not authorized');
+    }
 
-  const [transaction_count, transaction_value] = await transactions_tracker();
+    const [transaction_count, transaction_value] = await transactions_tracker();
 
-  res.status(200).json({
-    transaction_count: transaction_count,
-    transaction_value: transaction_value,
-  });
+    res.status(200).json({
+        transaction_count: transaction_count,
+        transaction_value: transaction_value,
+    });
 };
 
 const addTerminalId = async (req, res) => {
-  const { userId } = req.user;
+    const { userId } = req.user;
 
-  if (!userId) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
-
-  const { stormId, terminalId, isTransferEnabled } = req.body;
-
-  if (!stormId) {
-    throw new BadRequestError('missing stormId field');
-  }
-
-  if (!terminalId && !isTransferEnabled) {
-    throw new BadRequestError('missing Fields');
-  }
-
-  if (isTransferEnabled) {
-    if (isTransferEnabled != 'true' && isTransferEnabled != 'false') {
-      throw new BadRequestError('invalid input for field isTransferEnabled');
+    if (!userId) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
     }
-  }
 
-  const check_if_terminal_id_is_assigned = await user.findOne({
-    attributes: ['terminal_id'],
+    const { stormId, terminalId, isTransferEnabled } = req.body;
 
-    where: {
-      terminal_id: terminalId,
-    },
-  });
+    if (!stormId) {
+        throw new BadRequestError('missing stormId field');
+    }
 
-  if (check_if_terminal_id_is_assigned) {
-    throw new BadRequestError('terminal id already assigned');
-  }
+    if (!terminalId && !isTransferEnabled) {
+        throw new BadRequestError('missing Fields');
+    }
 
-  const terminal_id_from_db = await terminal_id.findOne({
-    where: {
-      terminal_id: terminalId,
-    },
-  });
+    if (isTransferEnabled) {
+        if (isTransferEnabled != 'true' && isTransferEnabled != 'false') {
+            throw new BadRequestError(
+                'invalid input for field isTransferEnabled'
+            );
+        }
+    }
 
-  if (!terminal_id_from_db) {
-    throw new Error('terminal id does not exist');
-  }
+    const check_if_terminal_id_is_assigned = await user.findOne({
+        attributes: ['terminal_id'],
 
-  const user_to_update = await user.findOne({
-    attributes: [
-      'storm_id',
-      'email',
-      'password',
-      'business_name',
-      'mobile_number',
-      'account_number',
-      'type',
-      'createdAt',
-      'updatedAt',
-    ],
-    where: {
-      storm_id: stormId,
-    },
-  });
+        where: {
+            terminal_id: terminalId,
+        },
+    });
 
-  if (!user_to_update) {
-    throw new NotFoundError('cannot find user');
-  }
+    if (check_if_terminal_id_is_assigned) {
+        throw new BadRequestError('terminal id already assigned');
+    }
 
-  if (terminalId) {
-    user_to_update.terminal_id = terminalId;
-    terminal_id_from_db.is_assigned = true;
+    const terminal_id_from_db = await terminal_id.findOne({
+        where: {
+            terminal_id: terminalId,
+        },
+    });
 
-    await terminal_id_from_db.save({ fields: ['is_assigned'] });
+    if (!terminal_id_from_db) {
+        throw new Error('terminal id does not exist');
+    }
 
-    await user_to_update.save({ fields: ['terminal_id'] });
-  }
-  if (isTransferEnabled) {
-    user_to_update.is_transfer_enabled = isTransferEnabled;
-    await user_to_update.save({ fields: ['is_transfer_enabled'] });
-  }
+    const user_to_update = await user.findOne({
+        attributes: [
+            'storm_id',
+            'email',
+            'password',
+            'business_name',
+            'mobile_number',
+            'account_number',
+            'type',
+            'createdAt',
+            'updatedAt',
+        ],
+        where: {
+            storm_id: stormId,
+        },
+    });
 
-  if (terminalId && isTransferEnabled === 'true') {
-    res.send('terminal Id and transfer enabled');
-    return;
-  }
+    if (!user_to_update) {
+        throw new NotFoundError('cannot find user');
+    }
 
-  if (terminalId && isTransferEnabled === 'false') {
-    res.send('terminal id and transfer disabled');
-    return;
-  }
+    if (terminalId) {
+        user_to_update.terminal_id = terminalId;
+        terminal_id_from_db.is_assigned = true;
 
-  terminalId
-    ? res.send('terminal id updated')
-    : isTransferEnabled === 'true'
-    ? res.send('transfer enabled')
-    : isTransferEnabled === 'false'
-    ? res.send('transfer disabled')
-    : res.status(400).send('bad request');
+        await terminal_id_from_db.save({ fields: ['is_assigned'] });
+
+        await user_to_update.save({ fields: ['terminal_id'] });
+    }
+    if (isTransferEnabled) {
+        user_to_update.is_transfer_enabled = isTransferEnabled;
+        await user_to_update.save({ fields: ['is_transfer_enabled'] });
+    }
+
+    if (terminalId && isTransferEnabled === 'true') {
+        res.send('terminal Id and transfer enabled');
+        return;
+    }
+
+    if (terminalId && isTransferEnabled === 'false') {
+        res.send('terminal id and transfer disabled');
+        return;
+    }
+
+    terminalId
+        ? res.send('terminal id updated')
+        : isTransferEnabled === 'true'
+        ? res.send('transfer enabled')
+        : isTransferEnabled === 'false'
+        ? res.send('transfer disabled')
+        : res.status(400).send('bad request');
 };
 
 const getStormUsers = async (req, res) => {
-  const { userId } = req.user;
+    const { userId } = req.user;
 
-  if (!userId) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
+    if (!userId) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
+    }
 
-  const page = req.query.page;
+    const page = req.query.page;
 
-  const stormId = req.query.stormId;
+    const stormId = req.query.stormId;
 
-  const email = req.query.email;
+    const email = req.query.email;
 
-  const tid = req.query.tid;
+    const tid = req.query.tid;
 
-  if (!page) {
-    throw new BadRequestError('query param page is missing');
-  }
-  if (isNaN(page)) {
-    throw new BadRequestError('query param page must be a number');
-  }
+    if (!page) {
+        throw new BadRequestError('query param page is missing');
+    }
+    if (isNaN(page)) {
+        throw new BadRequestError('query param page must be a number');
+    }
 
-  const users = stormId
-    ? await user.findOne({
-        attributes: [
-          'business_name',
-          'email',
-          'mobile_number',
-          'storm_id',
-          'terminal_id',
-          'is_transfer_enabled',
-          'type',
-          'aggregator_id',
-          'createdAt',
-          'updatedAt',
-        ],
+    const queryGenerator = async (queryParam, findBy) => {
+        const sql = `select business_name,email,mobile_number, 
+        users.storm_id,users.terminal_id, is_transfer_enabled,type,users.aggregator_id, 
+        COALESCE(storm_wallets_view.wallet_balance,0) as wallet_balance, 
+        COALESCE(ledger_balance_view.ledger_balance,0) as ledger_balance
+        from users left join storm_wallets_view on users.storm_id= storm_wallets_view.storm_id
+        left join ledger_balance_view on users.storm_id= ledger_balance_view.storm_id 
+        where users.${queryParam}=?`;
 
-        where: {
-          storm_id: stormId,
-        },
-      })
-    : email
-    ? await user.findOne({
-        attributes: [
-          'business_name',
-          'email',
-          'mobile_number',
-          'storm_id',
-          'terminal_id',
-          'is_transfer_enabled',
-          'aggregator_id',
-          'type',
-          'createdAt',
-          'updatedAt',
-        ],
+        const result = await sequelize.query(sql, {
+            replacements: [findBy],
+            type: QueryTypes.SELECT,
+        });
 
-        where: {
-          email: email,
-        },
-      })
-    : tid
-    ? await user.findOne({
-        attributes: [
-          'business_name',
-          'email',
-          'mobile_number',
-          'storm_id',
-          'terminal_id',
-          'is_transfer_enabled',
-          'aggregator_id',
-          'type',
-          'createdAt',
-          'updatedAt',
-        ],
+        return result;
+    };
 
-        where: {
-          terminal_id: tid,
-        },
-      })
-    : await user.findAll({
-        attributes: [
-          'business_name',
-          'email',
-          'mobile_number',
-          'storm_id',
-          'terminal_id',
-          'is_transfer_enabled',
-          'aggregator_id',
-          'type',
-          'createdAt',
-          'updatedAt',
-        ],
-        offset: 20 * page,
-        limit: 20,
-        order: [['updatedAt', 'DESC']],
-      });
+    const users = stormId
+        ? await queryGenerator('storm_id', stormId)
+        : email
+        ? await queryGenerator('email', email)
+        : tid
+        ? await queryGenerator('terminal_id', tid)
+        : await await sequelize.query(
+              `select business_name,email,mobile_number, 
+        users.storm_id,users.terminal_id, is_transfer_enabled,type,users.aggregator_id, 
+        COALESCE(storm_wallets_view.wallet_balance,0) as wallet_balance,
+        COALESCE(ledger_balance_view.wallet_balance,0) as ledger_balance
+        from users left join storm_wallets_view on users.storm_id= storm_wallets_view.storm_id 
+        left join ledger_balance_view on users.storm_id= ledger_balance_view.storm_id
+        order by users.createdAt DESC`,
+              {
+                  type: QueryTypes.SELECT,
+              }
+          );
 
-  Array.isArray(users)
-    ? res.status(200).json({ page: page, count: users.length, result: users })
-    : res
-        .status(200)
-        .json({ page: page, count: users ? 1 : 0, result: [users] });
+    Array.isArray(users)
+        ? res
+              .status(200)
+              .json({ page: page, count: users.length, result: users })
+        : res.status(200).json({
+              page: page,
+              count: users ? 1 : 0,
+              result: users ? [users] : [],
+          });
 };
 
 const getTransactions = async (req, res) => {
-  const { userId } = req.user;
-  if (!userId) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
+    const { userId } = req.user;
+    if (!userId) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
+    }
 
-  const page = req.query.page;
+    const page = req.query.page;
 
-  const stormId = req.query.stormId;
+    const stormId = req.query.stormId;
 
-  const rrn = req.query.rrn;
+    const rrn = req.query.rrn;
 
-  const tid = req.query.tid;
+    const tid = req.query.tid;
 
-  const reference = req.query.reference;
+    const reference = req.query.reference;
 
-  const dateLowerBound = req.query.dateLowerBound;
+    const dateLowerBound = req.query.dateLowerBound;
 
-  const dateUpperBound = req.query.dateUpperBound;
+    const dateUpperBound = req.query.dateUpperBound;
 
-  const transactionList = await transactionGetter({
-    page,
-    stormId,
-    rrn,
-    tid,
-    reference,
-    dateLowerBound,
-    dateUpperBound,
-  });
+    const transactionList = await transactionGetter({
+        page,
+        stormId,
+        rrn,
+        tid,
+        reference,
+        dateLowerBound,
+        dateUpperBound,
+    });
 
-  Array.isArray(transactionList)
-    ? res.json({
-        page: page,
-        length: transactionList.length,
-        result: transactionList,
-      })
-    : res.json({
-        page: page,
-        length: 1,
-        result: [transactionList],
-      });
+    Array.isArray(transactionList)
+        ? res.json({
+              page: page,
+              length: transactionList.length,
+              result: transactionList,
+          })
+        : transactionList
+        ? res.json({
+              page: page,
+              length: 1,
+              result: [transactionList],
+          })
+        : res.json({
+              page: page,
+              length: 0,
+              result: [],
+          });
 };
 
 const superAdminLogin = async (req, res) => {
-  const user_credentials = req.body;
+    const user_credentials = req.body;
 
-  if (!user_credentials.email || !user_credentials.password) {
-    throw new BadRequestError('missing body field');
-  }
-
-  const super_admin = await superadmin.findOne({
-    attributes: ['password'],
-
-    where: {
-      email: user_credentials.email,
-    },
-  });
-
-  if (!super_admin) {
-    throw new UnauthenticatedError('wrong username or password');
-  }
-
-  const is_password_the_same = await bcrypt.compare(
-    user_credentials.password,
-    super_admin.dataValues.password
-  );
-
-  if (is_password_the_same === true) {
-    try {
-      const token = jwt.sign(
-        { email: user_credentials.email },
-        process.env.ADMINSECRET,
-        { expiresIn: '10m' }
-      );
-
-      res.status(200).json({ token: token });
-    } catch (e) {
-      console.log(e);
-      throw new BadRequestError('something went wrong');
+    if (!user_credentials.email || !user_credentials.password) {
+        throw new BadRequestError('missing body field');
     }
-  } else {
-    throw new UnauthenticatedError('Incorrect login credentials');
-  }
+
+    const super_admin = await superadmin.findOne({
+        attributes: ['password'],
+
+        where: {
+            email: user_credentials.email,
+        },
+    });
+
+    if (!super_admin) {
+        throw new UnauthenticatedError('wrong username or password');
+    }
+
+    const is_password_the_same = await bcrypt.compare(
+        user_credentials.password,
+        super_admin.dataValues.password
+    );
+
+    if (is_password_the_same === true) {
+        try {
+            const token = jwt.sign(
+                { email: user_credentials.email },
+                process.env.ADMINSECRET,
+                { expiresIn: '10m' }
+            );
+
+            res.status(200).json({ token: token });
+        } catch (e) {
+            console.log(e);
+            throw new BadRequestError('something went wrong');
+        }
+    } else {
+        throw new UnauthenticatedError('Incorrect login credentials');
+    }
 };
 
 const registerAdmin = async (req, res) => {
-  if (!req.headers.authorization) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
+    if (!req.headers.authorization) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
+    }
 
-  const super_admin_token = req.headers.authorization;
+    const super_admin_token = req.headers.authorization;
 
-  let super_user_email = null;
+    let super_user_email = null;
 
-  try {
-    const payload = jwt.verify(super_admin_token, process.env.ADMINSECRET);
+    try {
+        const payload = jwt.verify(super_admin_token, process.env.ADMINSECRET);
 
-    super_user_email = payload.email;
-  } catch (error) {
-    throw new UnauthenticatedError('Authentication invalid');
-  }
+        super_user_email = payload.email;
+    } catch (error) {
+        throw new UnauthenticatedError('Authentication invalid');
+    }
 
-  if (!super_user_email) {
-    throw new UnauthenticatedError('Authentication Invalid');
-  }
+    if (!super_user_email) {
+        throw new UnauthenticatedError('Authentication Invalid');
+    }
 
-  const {
-    email,
-    password,
-    businessName,
-    mobileNumber,
-    accountNumber,
-    bvn,
-    role,
-    bankName,
-  } = req.body;
+    const {
+        email,
+        password,
+        businessName,
+        mobileNumber,
+        accountNumber,
+        bvn,
+        role,
+        bankName,
+    } = req.body;
 
-  if (
-    !password ||
-    !email ||
-    !businessName ||
-    !mobileNumber ||
-    !accountNumber ||
-    !bvn
-  ) {
-    throw new BadRequestError('missing field');
-  }
+    if (
+        !password ||
+        !email ||
+        !businessName ||
+        !mobileNumber ||
+        !accountNumber ||
+        !bvn
+    ) {
+        throw new BadRequestError('missing field');
+    }
 
-  const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(10);
 
-  const hashed_password = await bcrypt.hash(password, salt);
+    const hashed_password = await bcrypt.hash(password, salt);
 
-  const new_admin = await admin.create({
-    email: email,
+    const new_admin = await admin.create({
+        email: email,
 
-    password: hashed_password,
+        password: hashed_password,
 
-    business_name: businessName,
+        business_name: businessName,
 
-    mobile_number: mobileNumber,
+        mobile_number: mobileNumber,
 
-    account_number: accountNumber,
+        account_number: accountNumber,
 
-    bvn: bvn,
+        bvn: bvn,
 
-    super_user: super_user_email,
-  });
+        super_user: super_user_email,
+    });
 
-  if (!new_admin) {
-    throw new BadRequestError('something went wrong');
-  }
+    if (!new_admin) {
+        throw new BadRequestError('something went wrong');
+    }
 
-  delete new_admin.dataValues.password;
+    delete new_admin.dataValues.password;
 
-  let token = null;
-  try {
-    token = jwt.sign(
-      { adminId: new_admin.dataValues.admin_id },
-      process.env.ADMINUSERSECRET,
-      {
-        expiresIn: '1d',
-      }
-    );
-  } catch (e) {
-    console.log(e);
-    throw new BadRequestError('something went wrong');
-  }
+    let token = null;
+    try {
+        token = jwt.sign(
+            { adminId: new_admin.dataValues.admin_id },
+            process.env.ADMINUSERSECRET,
+            {
+                expiresIn: '1d',
+            }
+        );
+    } catch (e) {
+        console.log(e);
+        throw new BadRequestError('something went wrong');
+    }
 
-  const [transaction_count, transaction_value] = await transactions_tracker();
+    const [transaction_count, transaction_value] = await transactions_tracker();
 
-  res.status(201).json({
-    admin: new_admin,
-    token: token,
-    transaction_count: transaction_count,
-    transaction_value: transaction_value,
-  });
+    res.status(201).json({
+        admin: new_admin,
+        token: token,
+        transaction_count: transaction_count,
+        transaction_value: transaction_value,
+    });
 };
 
 const adminLogin = async (req, res) => {
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  if (!email || !password) {
-    throw new BadRequestError('request body fields incorrect');
-  }
+    if (!email || !password) {
+        throw new BadRequestError('request body fields incorrect');
+    }
 
-  const user_that_want_to_login = await admin.findOne({
-    attributes: [
-      'email',
-      'admin_id',
-      'business_name',
-      'mobile_number',
-      'password',
-    ],
-    where: {
-      email: email,
-    },
-  });
+    const user_that_want_to_login = await admin.findOne({
+        attributes: [
+            'email',
+            'admin_id',
+            'business_name',
+            'mobile_number',
+            'password',
+        ],
+        where: {
+            email: email,
+        },
+    });
 
-  if (!user_that_want_to_login) {
-    throw new UnauthenticatedError('Incorrect login credentials');
-  }
+    if (!user_that_want_to_login) {
+        throw new UnauthenticatedError('Incorrect login credentials');
+    }
 
-  const is_password_the_same = await bcrypt.compare(
-    password,
-    user_that_want_to_login.dataValues.password
-  );
-
-  if (is_password_the_same == false) {
-    throw new UnauthenticatedError('Incorrect login credentials');
-  }
-
-  let token = null;
-  try {
-    token = jwt.sign(
-      { adminId: user_that_want_to_login.dataValues.admin_id },
-      process.env.ADMINUSERSECRET,
-      {
-        expiresIn: '1d',
-      }
+    const is_password_the_same = await bcrypt.compare(
+        password,
+        user_that_want_to_login.dataValues.password
     );
-  } catch (e) {
-    console.log(e);
-    throw new BadRequestError('something went wrong');
-  }
 
-  if (token === null) {
-    throw new BadRequestError('something went wrong');
-  }
+    if (is_password_the_same == false) {
+        throw new UnauthenticatedError('Incorrect login credentials');
+    }
 
-  const [transaction_count, transaction_value] = await transactions_tracker();
+    let token = null;
+    try {
+        token = jwt.sign(
+            { adminId: user_that_want_to_login.dataValues.admin_id },
+            process.env.ADMINUSERSECRET,
+            {
+                expiresIn: '1d',
+            }
+        );
+    } catch (e) {
+        console.log(e);
+        throw new BadRequestError('something went wrong');
+    }
 
-  delete user_that_want_to_login.dataValues.password;
-  res.status(200).json({
-    admin: user_that_want_to_login,
-    token: token,
-    transaction_count: transaction_count,
-    transaction_value: transaction_value,
-  });
+    if (token === null) {
+        throw new BadRequestError('something went wrong');
+    }
+
+    const [transaction_count, transaction_value] = await transactions_tracker();
+
+    delete user_that_want_to_login.dataValues.password;
+    res.status(200).json({
+        admin: user_that_want_to_login,
+        token: token,
+        transaction_count: transaction_count,
+        transaction_value: transaction_value,
+    });
 };
 
 const createTerminalId = async (req, res) => {
-  const { userId } = req.user;
+    const { userId } = req.user;
 
-  if (!userId) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
+    if (!userId) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
+    }
 
-  const { terminalId, merchantId } = req.body;
+    const { terminalId, merchantId } = req.body;
 
-  if (!terminalId || !merchantId) {
-    throw new BadRequestError('missing fields');
-  }
+    if (!terminalId || !merchantId) {
+        throw new BadRequestError('missing fields');
+    }
 
-  const createdTerminalId = await terminal_id.create({
-    terminal_id: terminalId,
+    const createdTerminalId = await terminal_id.create({
+        terminal_id: terminalId,
 
-    merchant_id: merchantId,
-  });
+        merchant_id: merchantId,
+    });
 
-  if (!createdTerminalId) {
-    throw new Error('something went wrong');
-  }
+    if (!createdTerminalId) {
+        throw new Error('something went wrong');
+    }
 
-  res.status(200).send('terminal Id created');
+    res.status(200).send('terminal Id created');
 };
 
 const getDebitTransactions = async (req, res) => {
-  const { userId } = req.user;
+    const { userId } = req.user;
 
-  if (!userId) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
+    if (!userId) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
+    }
 
-  const stormId = req.query.stormId;
+    const stormId = req.query.stormId;
 
-  const page = req.query.page;
+    const page = req.query.page;
 
-  const reference = req.query.reference;
+    const reference = req.query.reference;
 
-  const terminalId = req.query.terminalId;
+    const terminalId = req.query.terminalId;
 
-  if (isNaN(page)) {
-    throw new BadRequestError('page must be a number');
-  }
+    if (isNaN(page)) {
+        throw new BadRequestError('page must be a number');
+    }
 
-  if (!reference && !page) {
-    throw new BadRequestError('missing key query param');
-  }
+    if (!reference && !page) {
+        throw new BadRequestError('missing key query param');
+    }
 
-  const transaction_list = await debit_transaction_getter(
-    stormId,
-    page,
-    terminalId,
-    reference
-  );
+    const transaction_list = await debit_transaction_getter(
+        stormId,
+        page,
+        terminalId,
+        reference
+    );
 
-  if (!transaction_list) {
-    throw new Error('Something went wrong');
-  }
+    if (!transaction_list) {
+        throw new Error('Something went wrong');
+    }
 
-  if (transaction_list[0] == null) {
-    res.send([]);
-  }
+    if (transaction_list[0] == null) {
+        res.send([]);
+    }
 
-  res.send(transaction_list);
+    res.send(transaction_list);
 };
 
 const getTerminalIds = async (req, res) => {
-  const { userId } = req.user;
-  if (!userId) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
+    const { userId } = req.user;
+    if (!userId) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
+    }
 
-  const page = req.query.page;
+    const page = req.query.page;
 
-  if (isNaN(page)) {
-    throw new BadRequestError('page must be a number');
-  }
+    if (isNaN(page)) {
+        throw new BadRequestError('page must be a number');
+    }
 
-  const terminalIds = await terminal_id.findAll({
-    offset: 20 * page,
-    limit: 20,
-    order: [['updatedAt', 'DESC']],
-  });
+    const terminalIds = await terminal_id.findAll({
+        offset: 20 * page,
+        limit: 20,
+        order: [['updatedAt', 'DESC']],
+    });
 
-  res.json({
-    page: page,
-    length: terminalIds.length,
-    result: terminalIds,
-  });
+    res.json({
+        page: page,
+        length: terminalIds.length,
+        result: terminalIds,
+    });
 };
 
 const changeAgentType = async (req, res) => {
-  const { userId } = req.user;
-  if (!userId) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
+    const { userId } = req.user;
+    if (!userId) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
+    }
 
-  const { stormId, type } = req.body;
+    const { stormId, type } = req.body;
 
-  if (!stormId || !type) {
-    throw new BadRequestError('missing field');
-  }
+    if (!stormId || !type) {
+        throw new BadRequestError('missing field');
+    }
 
-  if (type != 'agent_1' && type != 'agent_2' && type != 'merchant') {
-    throw new BadRequestError('invalid input for type field');
-  }
+    if (type != 'agent_1' && type != 'agent_2' && type != 'merchant') {
+        throw new BadRequestError('invalid input for type field');
+    }
 
-  const user_from_db = await user.findOne({
-    where: {
-      storm_id: stormId,
-    },
-  });
+    const user_from_db = await user.findOne({
+        where: {
+            storm_id: stormId,
+        },
+    });
 
-  if (!user_from_db) {
-    throw new NotFoundError('user not found!');
-  }
+    if (!user_from_db) {
+        throw new NotFoundError('user not found!');
+    }
 
-  user_from_db.type = type;
+    user_from_db.type = type;
 
-  await user_from_db.save({
-    fields: ['type'],
-    exclude: ['terminalIdTerminalId'],
-  });
+    await user_from_db.save({
+        fields: ['type'],
+        exclude: ['terminalIdTerminalId'],
+    });
 
-  res.send('user type updated');
+    res.send('user type updated');
 };
 
 const changePassword = async (req, res) => {
-  const { userId } = req.user;
-  if (!userId) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
+    const { userId } = req.user;
+    if (!userId) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
+    }
 
-  const { stormId, newPassword } = req.body;
+    const { stormId, newPassword } = req.body;
 
-  if (!stormId || !newPassword) {
-    throw new BadRequestError('missing field');
-  }
+    if (!stormId || !newPassword) {
+        throw new BadRequestError('missing field');
+    }
 
-  if (newPassword.length < 3) {
-    throw new BadRequestError('password too short');
-  }
+    if (newPassword.length < 3) {
+        throw new BadRequestError('password too short');
+    }
 
-  const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(10);
 
-  const hashed_password = await bcrypt.hash(newPassword, salt);
+    const hashed_password = await bcrypt.hash(newPassword, salt);
 
-  const user_from_db = await user.findOne({
-    where: {
-      storm_id: stormId,
-    },
-  });
+    const user_from_db = await user.findOne({
+        where: {
+            storm_id: stormId,
+        },
+    });
 
-  if (!user_from_db) {
-    throw new NotFoundError('user not found!');
-  }
+    if (!user_from_db) {
+        throw new NotFoundError('user not found!');
+    }
 
-  user_from_db.password = hashed_password;
+    user_from_db.password = hashed_password;
 
-  await user_from_db.save({
-    fields: ['password'],
-  });
+    await user_from_db.save({
+        fields: ['password'],
+    });
 
-  res.send('password updated');
+    res.send('password updated');
 };
 
 const assignAggregator = async (req, res) => {
-  const { userId } = req.user;
-  if (!userId) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
+    const { userId } = req.user;
+    if (!userId) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
+    }
 
-  const { aggregatorId, stormId } = req.body;
+    const { aggregatorId, stormId } = req.body;
 
-  if (!aggregatorId || !stormId) {
-    throw new BadRequestError('missing fields');
-  }
+    if (!aggregatorId || !stormId) {
+        throw new BadRequestError('missing fields');
+    }
 
-  const user_from_db = await user.findOne({
-    where: {
-      storm_id: stormId,
-    },
-  });
+    const user_from_db = await user.findOne({
+        where: {
+            storm_id: stormId,
+        },
+    });
 
-  if (!user_from_db) {
-    throw new UnauthenticatedError('no user found');
-  }
+    if (!user_from_db) {
+        throw new UnauthenticatedError('no user found');
+    }
 
-  user_from_db.aggregator_id = aggregatorId;
+    user_from_db.aggregator_id = aggregatorId;
 
-  await user_from_db.save({ fields: ['aggregator_id'] });
+    await user_from_db.save({ fields: ['aggregator_id'] });
 
-  res.send('aggregator updated');
+    res.send('aggregator updated');
 };
 
 const getAggregators = async (req, res) => {
-  const { userId } = req.user;
+    const { userId } = req.user;
 
-  if (!userId) {
-    throw new UnauthenticatedError('UNAUTHORIZED');
-  }
-
-  const page = req.query.page;
-
-  const id = req.query.id;
-
-  const email = req.query.email;
-
- 
-
-  if (page) {
-    if (isNaN(page)) {
-      throw new BadRequestError('query param page must be a number');
+    if (!userId) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
     }
-  }
 
-  const queryObject = {
-    attributes: [
-      'id',
-      'email',
-      'name',
-      'phoneNumber',
-      'createdAt',
-      'updatedAt',
-    ],
+    const page = req.query.page;
 
-    where: {
-      id: id,
+    const id = req.query.id;
 
-      email: email,
-    },
+    const email = req.query.email;
 
-    offset: page * 20,
+    if (page) {
+        if (isNaN(page)) {
+            throw new BadRequestError('query param page must be a number');
+        }
+    }
 
-    limit: 20,
+    const queryObject = {
+        attributes: [
+            'id',
+            'email',
+            'name',
+            'phoneNumber',
+            'createdAt',
+            'updatedAt',
+        ],
 
-    order: [['updatedAt', 'DESC']],
-  };
+        where: {
+            id: id,
 
-  if (!email) {
-    delete queryObject.where.email;
-  }
+            email: email,
+        },
 
-  if (!id) {
-    delete queryObject.where.id;
-  }
+        offset: page * 20,
 
-  if (!page) {
-    delete queryObject.limit;
-    delete queryObject.offset;
-  }
+        limit: 20,
 
-  const aggregatorList =
-    email || id
-      ? await aggregators.findOne(queryObject)
-      : await aggregators.findAll(queryObject);
+        order: [['updatedAt', 'DESC']],
+    };
 
-  Array.isArray(aggregatorList)
-    ? res.json({
-        page: page,
-        length: aggregatorList.length,
-        result: aggregatorList,
-      })
-    : res.json({
-        page: page,
-        length: 1,
-        result: [aggregatorList],
-      });
+    if (!email) {
+        delete queryObject.where.email;
+    }
 
-  console.log(page);
+    if (!id) {
+        delete queryObject.where.id;
+    }
+
+    if (!page) {
+        delete queryObject.limit;
+        delete queryObject.offset;
+    }
+
+    const aggregatorList =
+        email || id
+            ? await aggregators.findOne(queryObject)
+            : await aggregators.findAll(queryObject);
+
+    Array.isArray(aggregatorList)
+        ? res.json({
+              page: page,
+              length: aggregatorList.length,
+              result: aggregatorList,
+          })
+        : res.json({
+              page: page,
+              length: 1,
+              result: [aggregatorList],
+          });
+
+    console.log(page);
+};
+
+const toggleBusyFlagAdmin = async (req, res) => {
+    const { userId } = req.user;
+
+    if (!userId) {
+        throw new UnauthenticatedError('UNAUTHORIZED');
+    }
+
+    const { stormId } = req.body;
+
+    if (!stormId) {
+        throw new BadRequestError('missing storm id field');
+    }
+
+    const wallet = await storm_wallet.findOne({
+        where: {
+            storm_id: stormId,
+        },
+    });
+
+    if (!wallet) {
+        throw new UnauthenticatedError('user not found');
+    }
+
+    await toggleBusyFlag(wallet, false);
+
+    res.json({
+        status: 'successful',
+        message: 'busy flag off',
+    });
 };
 
 module.exports = {
-  addTerminalId,
-  getTransactions,
-  superAdminLogin,
-  registerAdmin,
-  adminLogin,
-  transactionsTrackerRoute,
-  getStormUsers,
-  createTerminalId,
-  getDebitTransactions,
-  getTerminalIds,
-  changeAgentType,
-  changePassword,
-  assignAggregator,
-  transactionGetter,
-  getAggregators,
+    addTerminalId,
+    getTransactions,
+    superAdminLogin,
+    registerAdmin,
+    adminLogin,
+    transactionsTrackerRoute,
+    getStormUsers,
+    createTerminalId,
+    getDebitTransactions,
+    getTerminalIds,
+    changeAgentType,
+    changePassword,
+    assignAggregator,
+    transactionGetter,
+    getAggregators,
+    toggleBusyFlagAdmin,
 };
