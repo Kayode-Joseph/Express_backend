@@ -146,14 +146,22 @@ const debit_transaction_getter = async (
 };
 
 //function to push transaction to webhook
-const netposWebHookFunc = async (req, RRN, transactionStatus, userType, amount) => {
+const netposWebHookFunc = async (
+    req,
+    RRN,
+    transactionStatus,
+    userType,
+    amount
+) => {
     const netposWebHookResponse = await axios.post(
-        userType=== 'merchant'?  process.env.MERCHANTWEBHOOK : process.env.WEBHOOKURL ,
+        userType === 'merchant'
+            ? process.env.MERCHANTWEBHOOK
+            : process.env.WEBHOOKURL,
         {
             transactionResponse: {
                 ...req.body,
                 rrn: RRN,
-                amount: userType==='merchant'? amount*100 : amount,
+                amount: userType === 'merchant' ? amount * 100 : amount,
                 responseMessage: transactionStatus,
             },
         },
@@ -228,6 +236,9 @@ const updateTransactionAndWalletBalance = async (req, res) => {
     if (Math.sign(amount) != 1) {
         throw new BadRequestError('invalid transaction amount');
     }
+    if (routingChannel != 'NIBSS' && routingChannel != 'ISW') {
+        throw new BadRequestError('invalid routing channel');
+    }
 
     const checkIfTransactionExists = await transactions.findOne({
         attributes: ['rrn'],
@@ -259,7 +270,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
         throw new BadRequestError('userType mismatch');
     }
 
-
+    if (routingChannel === 'NIBSS') {
         let netposWebHookResponse = null;
 
         for (let i = 0; i < 2; i++) {
@@ -285,7 +296,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
                 console.log(netposWebHookResponse.data);
             } catch (e) {
                 console.log(
-                    JSON.stringify(e) +
+                    JSON.stringify(e.message) +
                         '\n count: ' +
                         i +
                         '\ntime: ' +
@@ -293,7 +304,7 @@ const updateTransactionAndWalletBalance = async (req, res) => {
                 );
             }
         }
-    
+    }
 
     //logging the transaction
     const created_transaction = await transactions.create({

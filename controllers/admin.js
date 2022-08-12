@@ -390,10 +390,10 @@ const getStormUsers = async (req, res) => {
               `select business_name,email,mobile_number, 
         users.storm_id,users.terminal_id, is_transfer_enabled,type,users.aggregator_id, 
         COALESCE(storm_wallets_view.wallet_balance,0) as wallet_balance,
-        COALESCE(ledger_balance_view.wallet_balance,0) as ledger_balance
+        COALESCE(ledger_balance_view.ledger_balance,0) as ledger_balance
         from users left join storm_wallets_view on users.storm_id= storm_wallets_view.storm_id 
         left join ledger_balance_view on users.storm_id= ledger_balance_view.storm_id
-        order by users.createdAt DESC`,
+        order by users.createdAt DESC limit 20 offset ${page*20}`,
               {
                   type: QueryTypes.SELECT,
               }

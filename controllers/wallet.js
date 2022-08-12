@@ -160,7 +160,7 @@ const eTranzactCaller = async (
             { timeout: 32000 }
         );
     } catch (error) {
-        console.log(error);
+        console.log(error.data);
         debitTransaction.response_code = 500;
 
         debitTransaction.response_message = error.message;
@@ -536,23 +536,34 @@ const verifyName = async (req, res, next) => {
 
     const referenceRandom = Math.floor(Math.random() * 1000000000000000);
 
-    const eTranzactResponse = await axios.post(
-        'https://www.etranzact.net/rest/switchIT/api/v1/account-query',
-        {
-            action: 'AQ',
-            terminalId: process.env.TID,
-            transaction: {
-                pin: process.env.AES,
-                bankCode: bankCode,
-                amount: '0.0',
-                description: 'Account Query',
-                destination: accountNumber,
-                reference: `AQSTORM${referenceRandom}`,
-                endPoint: 'A',
+    const eTranzactResponse = null;
+    try {
+        eTranzactResponse = await axios.post(
+            'https://www.etranzact.net/rest/switchIT/api/v1/account-query',
+            {
+                action: 'AQ',
+                terminalId: process.env.TID,
+                transaction: {
+                    pin: process.env.AES,
+                    bankCode: bankCode,
+                    amount: '0.0',
+                    description: 'Account Query',
+                    destination: accountNumber,
+                    reference: `AQSTORM${referenceRandom}`,
+                    endPoint: 'A',
+                },
             },
-        },
-        { timeout: 15000 }
-    );
+            { timeout: 30000 }
+        );
+    } catch (e) {
+        console.log(e.message);
+
+        next(e);
+    }
+
+    if (!eTranzactResponse) {
+        throw new Error('something went wrong');
+    }
 
     if (eTranzactResponse.data.error === '0') {
         res.status(200).json({
