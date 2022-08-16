@@ -409,57 +409,98 @@ const debitWallet = async (req, res, next) => {
 
     await toggleBusyFlag(stormWallet, true);
 
-    const referenceRandom = `FTSTORM${Math.floor(
-        Math.random() * 1000000000000000
-    )}`;
-
-    const description = `from ${senderName.substring(
-        0,
-        8
-    )} to ${recieverName.substring(0, 8)} via NetPos`;
-
-    const debitTransaction = await transactions.create({
-        bank_code: bankCode,
-        amount: -amount,
-        reference: referenceRandom,
-        description: description,
-        destination: accountNumber,
-        senderName: senderName,
-        endPoint: 'A',
-        terminal_id: user_from_database.dataValues.terminal_id,
-        storm_id: stormId,
-        transaction_status: 'declined',
-        user_type: userType,
-        transaction_fee: -transactionFee.dataValues.transfer_out_fee,
-        transaction_type: 'debit',
-    });
-
-    //res.send(eTranzactResponse.data);
-
-    let eTranzactResponse = null;
     try {
-        eTranzactResponse = await eTranzactCaller(
-            bankCode,
-            senderName,
-            recieverName,
-            accountNumber,
-            amount,
-            description,
-            referenceRandom,
-            debitTransaction,
-            next
-        );
-    } catch (e) {
+        const referenceRandom = `FTSTORM${Math.floor(
+            Math.random() * 1000000000000000
+        )}`;
+
+        const description = `from ${senderName.substring(
+            0,
+            8
+        )} to ${recieverName.substring(0, 8)} via NetPos`;
+
+        const debitTransaction = await transactions.create({
+            bank_code: bankCode,
+            amount: -amount,
+            reference: referenceRandom,
+            description: description,
+            destination: accountNumber,
+            senderName: senderName,
+            endPoint: 'A',
+            terminal_id: user_from_database.dataValues.terminal_id,
+            storm_id: stormId,
+            transaction_status: 'declined',
+            user_type: userType,
+            transaction_fee: -transactionFee.dataValues.transfer_out_fee,
+            transaction_type: 'debit',
+        });
+
+        //res.send(eTranzactResponse.data);
+
+        let eTranzactResponse = null;
+        try {
+            eTranzactResponse = await eTranzactCaller(
+                bankCode,
+                senderName,
+                recieverName,
+                accountNumber,
+                amount,
+                description,
+                referenceRandom,
+                debitTransaction,
+                next
+            );
+        } catch (e) {
+            await toggleBusyFlag(stormWallet, false);
+
+            next(e);
+        }
+
+        if (!eTranzactResponse) {
+            throw new Error('something went wrong');
+        }
+
+        if (eTranzactResponse.data.error === '0') {
+            debitTransaction.reference_from_etranzact =
+                eTranzactResponse.data.reference;
+
+            debitTransaction.response_code = eTranzactResponse.data.error;
+
+            debitTransaction.response_message = eTranzactResponse.data.message;
+
+            debitTransaction.transaction_status = 'approved';
+
+            debitTransaction.settlement_status = 'completed';
+
+            await debitTransaction.save({
+                fields: [
+                    'reference_from_etranzact',
+                    'response_code',
+                    'response_message',
+                    'transaction_status',
+                    'settlement_status',
+                ],
+            });
+
+            res.status(200).json({
+                code: '0',
+
+                message: 'Account Credited Successfully',
+
+                data: {
+                    ledger_balance: stormWallet.dataValues.ledger_balance,
+
+                    wallet_balance: stormWallet.dataValues.wallet_balance,
+                },
+            });
+
+            await toggleBusyFlag(stormWallet, false);
+
+            return;
+        }
+
         await toggleBusyFlag(stormWallet, false);
 
-        next(e);
-    }
-
-    if (!eTranzactResponse) {
-        throw new Error('something went wrong');
-    }
-
-    if (eTranzactResponse.data.error === '0') {
         debitTransaction.reference_from_etranzact =
             eTranzactResponse.data.reference;
 
@@ -467,58 +508,22 @@ const debitWallet = async (req, res, next) => {
 
         debitTransaction.response_message = eTranzactResponse.data.message;
 
-        debitTransaction.transaction_status = 'approved';
-
-        debitTransaction.settlement_status = 'completed';
-
         await debitTransaction.save({
             fields: [
                 'reference_from_etranzact',
                 'response_code',
                 'response_message',
-                'transaction_status',
-                'settlement_status',
             ],
         });
 
-        res.status(200).json({
-            code: '0',
-
-            message: 'Account Credited Successfully',
-
-            data: {
-                ledger_balance: stormWallet.dataValues.ledger_balance,
-
-                wallet_balance: stormWallet.dataValues.wallet_balance,
-            },
+        res.json({
+            code: eTranzactResponse.data.error,
+            message: eTranzactResponse.data.message,
         });
-
-        await toggleBusyFlag(stormWallet, false);
-
-        return;
+    } catch (e) {
+        toggleBusyFlag(stormWallet, false);
+        next(e);
     }
-
-    await toggleBusyFlag(stormWallet, false);
-
-    debitTransaction.reference_from_etranzact =
-        eTranzactResponse.data.reference;
-
-    debitTransaction.response_code = eTranzactResponse.data.error;
-
-    debitTransaction.response_message = eTranzactResponse.data.message;
-
-    await debitTransaction.save({
-        fields: [
-            'reference_from_etranzact',
-            'response_code',
-            'response_message',
-        ],
-    });
-
-    res.json({
-        code: eTranzactResponse.data.error,
-        message: eTranzactResponse.data.message,
-    });
 };
 
 const verifyName = async (req, res, next) => {
@@ -536,7 +541,7 @@ const verifyName = async (req, res, next) => {
 
     const referenceRandom = Math.floor(Math.random() * 1000000000000000);
 
-    const eTranzactResponse = null;
+    let eTranzactResponse = null;
     try {
         eTranzactResponse = await axios.post(
             'https://www.etranzact.net/rest/switchIT/api/v1/account-query',
@@ -585,6 +590,7 @@ const verifyName = async (req, res, next) => {
         message: eTranzactResponse.data.message,
     });
 };
+
 module.exports = {
     getBalance,
     createWallet,
