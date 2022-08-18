@@ -25,6 +25,8 @@ const {
   transactions,
 } = require('../DB/models');
 
+const { balanceGetter}=require('./wallet')
+
 const billQuery = async (req, res, next) => {
   const { userId } = req.user;
 
@@ -158,7 +160,7 @@ const billPayment = async (req, res, next) => {
    }
 
   const check_if_available_balance_is_sufficient_for_transaction = Math.sign(
-    stormWallet.dataValues.wallet_balance - amount + commission
+    balanceGetter(stormId, false) - amount + commission
   );
 
   if (
@@ -209,10 +211,10 @@ const billPayment = async (req, res, next) => {
 
     transaction_status: 'declined',
     response_message: null,
-    amount: amount,
+    amount: -amount,
     product_id: productId ? productId : null,
     bill_id: billId,
-
+    settlement_status: 'completed',
     destination: customerId,
     bill_name: null,
     reference_from_etranzact: billQueryRef ? billQueryRef : null,
@@ -254,17 +256,17 @@ const billPayment = async (req, res, next) => {
 
   console.log(eTranzactResponse.data)
   if (eTranzactResponse.data.status ===true) {
-    stormWallet.ledger_balance =
-      stormWallet.dataValues.ledger_balance -
-      amount + commission;
+    // stormWallet.ledger_balance =
+    //   stormWallet.dataValues.ledger_balance -
+    //   amount + commission;
 
-    stormWallet.wallet_balance =
-      stormWallet.dataValues.wallet_balance -
-      amount +commission;
+    // stormWallet.wallet_balance =
+    //   stormWallet.dataValues.wallet_balance -
+    //   amount +commission;
 
-    await stormWallet.save({
-      fields: ['ledger_balance', 'wallet_balance'],
-    });
+    // await stormWallet.save({
+    //   fields: ['ledger_balance', 'wallet_balance'],
+    // });
 
     bill.transaction_status = 'approved';
 
